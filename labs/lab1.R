@@ -24,8 +24,8 @@ b=rpois(100,0.5)
 c=rpois(1000,0.5)
 sum(a)
 
-posterior <- function(x,arrayPoisson,beta){
-  alpha=sum(arrayPoisson)
+posterior <- function(x,arrayPoisson,alpha,beta){
+  alpha=alpha + sum(arrayPoisson)
   beta=beta+length(arrayPoisson)
   return (dgamma(x,alpha,beta))
 }
@@ -37,19 +37,50 @@ for (i in 1:5)
 {
   if (i ==1){flag=FALSE}
   else {flag=TRUE}
-  curve(posterior(x,a,h2[i]),col=i,add=flag, from=0, to=1.5,ylim=c(0,6) , xlab="x", ylab="y")
+  curve(posterior(x,a,h1[i],h2[i]),col=i,add=flag, from=0, to=1.5,ylim=c(0,6) , xlab="x", ylab="y")
 }
 
 for (i in 1:5)
 {
   if (i ==1){flag=FALSE}
   else {flag=TRUE}
-  curve(posterior(x,b,h2[i]),col=i,add=flag, from=0, to=1.5,ylim=c(0,10) , xlab="x", ylab="y")
+  curve(posterior(x,b,h1[i],h2[i]),col=i,add=flag, from=0, to=1.5,ylim=c(0,10) , xlab="x", ylab="y")
 }
 for (i in 1:5)
 {
   if (i ==1){flag=FALSE}
   else {flag=TRUE}
-  curve(posterior(x,c,h2[i]),col=i,add=flag, from=0, to=1.5,ylim=c(0,20) , xlab="x", ylab="y")
+  curve(posterior(x,c,h1[i],h2[i]),col=i,add=flag, from=0, to=1.5,ylim=c(0,20) , xlab="x", ylab="y")
 }
 
+#punto 3
+
+posterior <- function(x,arrayPoisson,alpha,beta){
+  alpha=alpha + sum(arrayPoisson)
+  beta=beta+length(arrayPoisson)
+  return (dgamma(x,alpha,beta))
+}
+#mean
+posteriorExpetations = function(arrayPoisson,alpha,beta){
+  alpha=alpha + sum(arrayPoisson)
+  beta=beta+length(arrayPoisson)
+  return (alpha/beta)
+}
+#Maxima a posteriora (MAP)
+computeMap = function(arrayPoisson,alpha,beta){
+  alpha=alpha + sum(arrayPoisson)
+  beta=beta+length(arrayPoisson)
+  return ((alpha-1)/beta)
+}
+
+for (i in 1:5)
+{
+  if (i ==1){flag=FALSE}
+  else {flag=TRUE}
+  print(paste("mean:", posteriorExpetations(a,h1[i],h2[i])))
+  print(paste("median:", posteriorExpetations(a,h1[i],h2[i])))
+}
+
+
+
+  
