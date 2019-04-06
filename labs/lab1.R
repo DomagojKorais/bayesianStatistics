@@ -1,5 +1,5 @@
 
-set.seed(1,2,3)
+set.seed(123)
 
 
 #creo hyperparameters
