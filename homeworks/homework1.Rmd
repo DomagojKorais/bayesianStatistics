@@ -11,15 +11,41 @@ output:
 knitr::opts_chunk$set(echo = TRUE)
 knitr::opts_chunk$set(cache = TRUE)
 knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(arm)
 ```
 
 ## TH-1
 
-
+Let's start reproducing the scatter plot from slide 20
 
 ```{r th1}
 summary(cars)
+ggplot(cars,aes(x=speed,y=dist))+
+geom_point()+
+theme_light()+
+ggtitle("Cars dataset dist vs speed")
+
 ```
+Non informative prior linear regression:
+```{r non informative}
+nonInfromativeFit = bayesglm(dist ~ speed,data = cars, family = gaussian ,prior.mean = 1, prior.scale = Inf)
+display(nonInfromativeFit)
+
+
+informativeFit=bayesglm(dist ~ speed,data = cars, family = gaussian ,prior.mean = -100000, prior.scale = 0.1)
+display(informativeFit)
+
+ggplot(cars,aes(x=speed,y=dist))+
+geom_point()+
+theme_light()+
+ggtitle("Cars dataset dist vs speed")+
+  
+geom_abline(intercept=informativeFit$coefficients[1],    slope=informativeFit$coefficients[2],color="red")+
+  
+geom_abline(intercept=nonInfromativeFit$coefficients[1], slope=nonInfromativeFit$coefficients[2],color="green",linetype="dotted")
+```
+The results from both the informative and non informative priors are identical since it's a highly informative dataset.
 
 ## BDA-1
 
