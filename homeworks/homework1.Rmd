@@ -10,14 +10,15 @@ output:
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 knitr::opts_chunk$set(cache = TRUE)
-knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 library(arm)
+set.seed(pi)
 ```
 
 ## TH-1
 
 Let's start reproducing the scatter plot from slide 20
+A quick overview of the used dataset:
 
 ```{r th1}
 summary(cars)
@@ -27,25 +28,68 @@ theme_light()+
 ggtitle("Cars dataset dist vs speed")
 
 ```
-Non informative prior linear regression:
-```{r non informative}
+ Non informative vs informative prior linear regression:
+```{r fit full dataset}
+
 nonInfromativeFit = bayesglm(dist ~ speed,data = cars, family = gaussian ,prior.mean = 1, prior.scale = Inf)
+
+
+
+informativeFit=bayesglm(dist ~ speed,
+                            data = cars, 
+                            family = gaussian,
+                            prior.mean = 0, 
+                            prior.scale = 0.01,
+                            prior.mean.for.intercept = 0,
+                            prior.scale.for.intercept = 0.0001)
+display(informativeFit)
 display(nonInfromativeFit)
 
 
-informativeFit=bayesglm(dist ~ speed,data = cars, family = gaussian ,prior.mean = -100000, prior.scale = 0.1)
-display(informativeFit)
 
 ggplot(cars,aes(x=speed,y=dist))+
 geom_point()+
 theme_light()+
 ggtitle("Cars dataset dist vs speed")+
   
-geom_abline(intercept=informativeFit$coefficients[1],    slope=informativeFit$coefficients[2],color="red")+
+geom_abline(aes(intercept=informativeFit$coefficients[1],    slope=informativeFit$coefficients[2], col = "Informative"))+
   
-geom_abline(intercept=nonInfromativeFit$coefficients[1], slope=nonInfromativeFit$coefficients[2],color="green",linetype="dotted")
+geom_abline(aes(intercept=nonInfromativeFit$coefficients[1], slope=nonInfromativeFit$coefficients[2], col="Non informative"))+
+  scale_color_manual(name='Priors', values=c("red", "green"))
 ```
-The results from both the informative and non informative priors are identical since it's a highly informative dataset.
+The results from both the informative and non informative priors are very similar since it's a highly informative dataset.
+
+Let's try with a subset of the dataset
+
+```{r fit subset}
+cars = sample_n(cars,15)
+nonInfromativeFit = bayesglm(dist ~ speed,data = cars, family = gaussian ,prior.mean = 1, prior.scale = Inf)
+
+
+
+informativeFit=bayesglm(dist ~ speed,
+                            data = cars, 
+                            family = gaussian,
+                            prior.mean = 0, 
+                            prior.scale = 0.01,
+                            prior.mean.for.intercept = 0,
+                            prior.scale.for.intercept = 0.0001)
+display(informativeFit)
+display(nonInfromativeFit)
+
+
+
+ggplot(cars,aes(x=speed,y=dist))+
+geom_point()+
+theme_light()+
+ggtitle("Cars dataset dist vs speed")+
+  
+geom_abline(aes(intercept=informativeFit$coefficients[1],    slope=informativeFit$coefficients[2], col = "Informative"))+
+  
+geom_abline(aes(intercept=nonInfromativeFit$coefficients[1], slope=nonInfromativeFit$coefficients[2], col="Non informative"))+
+  scale_color_manual(name='Priors', values=c("red", "green"))
+```
+In this case we can see that the prior choice is important since it affects the final estimation of the parameters.
 
 ## BDA-1
 
