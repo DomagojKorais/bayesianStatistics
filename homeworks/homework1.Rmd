@@ -17,7 +17,8 @@ set.seed(pi)
 
 ## TH-1
 
-Let's start reproducing the scatter plot from slide 20
+Let's start reproducing the scatter plot from slide 20.
+
 A quick overview of the used dataset:
 
 ```{r th1}
@@ -28,7 +29,9 @@ theme_light()+
 ggtitle("Cars dataset dist vs speed")
 
 ```
+
  Non informative vs informative prior linear regression:
+ 
 ```{r fit full dataset}
 
 nonInfromativeFit = bayesglm(dist ~ speed,data = cars, family = gaussian ,prior.mean = 1, prior.scale = Inf)
@@ -57,6 +60,7 @@ geom_abline(aes(intercept=informativeFit$coefficients[1],    slope=informativeFi
 geom_abline(aes(intercept=nonInfromativeFit$coefficients[1], slope=nonInfromativeFit$coefficients[2], col="Non informative"))+
   scale_color_manual(name='Priors', values=c("red", "green"))
 ```
+
 The results from both the informative and non informative priors are very similar since it's a highly informative dataset.
 
 Let's try with a subset of the dataset
@@ -89,6 +93,7 @@ geom_abline(aes(intercept=informativeFit$coefficients[1],    slope=informativeFi
 geom_abline(aes(intercept=nonInfromativeFit$coefficients[1], slope=nonInfromativeFit$coefficients[2], col="Non informative"))+
   scale_color_manual(name='Priors', values=c("red", "green"))
 ```
+
 In this case we can see that the prior choice is important since it affects the final estimation of the parameters.
 
 ## BDA-1
@@ -99,12 +104,84 @@ In this case we can see that the prior choice is important since it affects the 
 ```{r lab1}
 library(AER)
 data("ShipAccidents")
+summary(ShipAccidents)
+
+#clean data and retain only useful columns for our analysis
+cleanData=ShipAccidents%>%
+  filter(service>0)
+
+#normalize data (since observation times are different I need to normalize)
+min_service=cleanData%>%
+  dplyr::select(service)%>%
+  dplyr::summarise(min=min(service))
+min_service=min_service$min
+
+cleanData = cleanData%>%
+  mutate(normalization=service/min_service)%>%
+  mutate(norm_incidents = incidents/normalization)
+
+#plot the normalized incidents histogram 
+ggplot(cleanData,aes(x=norm_incidents))+
+  geom_histogram(binwidth=0.01)
+
+#fit the data
+posterior <- function(x,arrayPoisson,alpha,beta){
+  alpha=alpha + sum(arrayPoisson)
+  beta=beta+length(arrayPoisson)
+  return (dgamma(x,alpha,beta))
+}
+
+#punto 2 plot numero incidenti medio al mese:
+#creo hyperparameters
+h1 = c(1,1,1,2,.5)  
+h2 = c(0.5,2,10,2,0) 
+a=cleanData$norm_incidents  
+for (i in 1:5)
+{
+  if (i ==1){flag=FALSE}
+  else {flag=TRUE}
+  
+  curve(posterior(x,a,h1[i],h2[i]),main="Montly posterior",col=i,add=flag, from=0, to=1,ylim=c(0,10) , xlab="x", ylab="y")
+}
+legend(0.5, 8,
+       legend=c("Gamma1", "Gamma2",
+                "Gamma3", "Gamma4",
+                "Jeffreys'"),
+       col=c(1:5), lty=1, cex=0.8)
+
 
 ```
 
+3) Find the posterior expectations and the maxima a posteriori (MAP) 
 
+```{r MAP and posterior}
+## posterior expectations
+(h1+sum(cleanData$norm_incidents))/(h2+count(cleanData)$n)
+##MAP
+(h1+sum(cleanData$norm_incidents)-1)/(h2+count(cleanData)$n)
+```
+
+4) Constructing the 95% credibility intervals with Jeffrey prior
 
 ```{r}
-plot(pressure)
+alpha=0.05
+qgamma(c(alpha/2,1-alpha/2),sum(cleanData$norm_incidents) + 1/2 ,count(cleanData)$n)
 ```
+
+5) Computing mode and the highest posterior density range
+```{r}
+hpd<-function(y,p){
+dy<-density(y)
+md<-dy$x[dy$y==max(dy$y)]
+py<-dy$y/sum(dy$y)
+pys<--sort(-py)
+ct<-min(pys[cumsum(pys)< p])
+list(hpdr=range(dy$x[py>=ct]),mode=md)
+}
+
+hpd(rgamma(1000,.5+sum(cleanData$norm_incidents),count(cleanData)$n),.95)
+```
+
+
+
 
