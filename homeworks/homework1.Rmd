@@ -10,6 +10,7 @@ output:
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 knitr::opts_chunk$set(cache = FALSE)
+knitr::opts_chunk$set(message=FALSE)
 library(tidyverse)
 library(arm)
 set.seed(pi)
@@ -94,22 +95,27 @@ geom_abline(aes(intercept=nonInfromativeFit$coefficients[1], slope=nonInfromativ
   scale_color_manual(name='Priors', values=c("red", "green"))
 ```
 
-In this case we can see that the prior choice is important since it affects the final estimation of the parameters.
+In this case we can see that the prior choice is important since the smaller the number of elements to perform the regression, the more important the choice of priors became.
 
 ## BDA-1
-2.7a)
-Given the exponential form: $h(y)g(\theta)e^{(\eta(\theta)*T(y))}$ we can rewrite the binomial as:
-${N \choose y} (1-\theta)^n exp(y *log(\frac{\theta}{1-\theta}))$ 
-With $\eta(\theta)=log(\frac{\theta}{1-\theta}) $ as the natural parameter. 
-Now we invert this quantity and we get $\theta=\frac{e^\phi}{1+e^\phi}$.
-At this point we use the result from Gelman (pag 21) to obtain:
-$p(\theta)\propto 1*\frac{d}{d\theta}log(\frac{\theta}{1-\theta})\propto\frac{1}{\theta(1-\theta)}$
+2.7a
+Using the following notation for the exponential form of a distribution: $$h(y)g(\theta)e^{(\eta(\theta)*T(y))}$$ 
+We can rewrite the binomial as:
+$${N \choose y} (1-\theta)^n exp(y *log(\frac{\theta}{1-\theta}))$$
 
-2.8a)
+With $$\eta(\theta)=log(\frac{\theta}{1-\theta})$$
+as the natural parameter. 
+Now we invert this quantity and we get:
+$$\theta=\frac{e^\phi}{1+e^\phi}$$
+At this point we use the result from Gelman (pag 21) to obtain:
+
+$$p(\theta)\propto 1*\frac{d}{d\theta}log(\frac{\theta}{1-\theta})\propto\frac{1}{\theta(1-\theta)}$$
+
+2.7b
 The posterior is 
 $$\pi(\theta|y)\propto p(y|\theta)\pi(\theta)$$
 $$\propto \theta^{y-1}(1-\theta)^{(n-y-1)}$$ 
-and this quantity has an infinite value for y=1 or y=n, so it's integral it's infinite and the distribution is improper.
+and this quantity has an infinite value for y=1 or y=n, going at infinite as $\lim_{x \to 0} \frac{1}{x}$ Since we know that this quantity has an infinite integral, the same holds for ours.
 
 ## BDA-2
 
@@ -130,6 +136,10 @@ The 95% intervals are [146,154] for $\theta$ and [111,189] for $\tilde y$
 ## LAB-1
 
 In this dataset we have different observation times so we need to account for that.
+
+We account for that recomputing the posterior using the exposure times ($x_i$):
+
+$$p(\theta | y)=\Gamma(\alpha+\sum y_i,\beta + \sum x_i)$$
 
 ```{r lab1}
 library(AER)
@@ -180,6 +190,9 @@ legend(0.004, 200,
 
 
 ```
+
+I choose to use different values for the priors parameters since the distributions are very different from the ones obtained in the classroom exercises.
+As we can see from the posteriors the distributions are very similar for all the priors, even if some of them were more informative (gamma3 for example).
 
 
 3) Find the posterior expectations and the maxima a posteriori (MAP) 
