@@ -9,7 +9,7 @@ output:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-knitr::opts_chunk$set(cache = TRUE)
+knitr::opts_chunk$set(cache = FALSE)
 library(tidyverse)
 library(arm)
 set.seed(pi)
@@ -101,6 +101,9 @@ In this case we can see that the prior choice is important since it affects the 
 ## BDA-2
 
 ## LAB-1
+
+In this dataset we have different observation times so we need to account for that.
+Since the alpha and beta values are 
 ```{r lab1}
 library(AER)
 data("ShipAccidents")
@@ -119,29 +122,34 @@ min_service=min_service$min
 cleanData = cleanData%>%
   mutate(normalization=service/min_service)%>%
   mutate(norm_incidents = incidents/normalization)
+  
 
 #plot the normalized incidents histogram 
 ggplot(cleanData,aes(x=norm_incidents))+
   geom_histogram(binwidth=0.01)
 
 #fit the data
-posterior <- function(x,arrayPoisson,alpha,beta){
+posterior <- function(x,arrayPoisson,exposures,alpha,beta){
   alpha=alpha + sum(arrayPoisson)
-  beta=beta+length(arrayPoisson)
+  beta=beta+sum(exposures)
+  print(alpha)
+  print(beta)
   return (dgamma(x,alpha,beta))
 }
 
 #punto 2 plot numero incidenti medio al mese:
 #creo hyperparameters
-h1 = c(1,1,1,2,.5)  
-h2 = c(0.5,2,10,2,0) 
-a=cleanData$norm_incidents  
+h1 = c(1,1,1,200,.5)  
+h2 = c(0.5,2,10000,2,0) 
+
+montlyIncidentsCountNormalized=cleanData$norm_incidents/min_service*100
+incidentsCount=count(cleanData)$n
 for (i in 1:5)
 {
   if (i ==1){flag=FALSE}
   else {flag=TRUE}
   
-  curve(posterior(x,a,h1[i],h2[i]),main="Montly posterior",col=i,add=flag, from=0, to=1,ylim=c(0,10) , xlab="x", ylab="y")
+  curve(posterior(x,cleanData$incidents,exposures = cleanData$service,h1[i],h2[i]),main="Montly posterior",col=i,add=flag, from=0, to=0.005,ylim=c(0,200) , xlab="x", ylab="y",n=10000)
 }
 legend(0.5, 8,
        legend=c("Gamma1", "Gamma2",
@@ -156,16 +164,16 @@ legend(0.5, 8,
 
 ```{r MAP and posterior}
 ## posterior expectations
-(h1+sum(cleanData$norm_incidents))/(h2+count(cleanData)$n)
+(h1+sum(montlyIncidentsCountNormalized))/(h2+incidentsCount)
 ##MAP
-(h1+sum(cleanData$norm_incidents)-1)/(h2+count(cleanData)$n)
+(h1+sum(montlyIncidentsCountNormalized)-1)/(h2+incidentsCount)
 ```
 
 4) Constructing the 95% credibility intervals with Jeffrey prior
 
 ```{r}
 alpha=0.05
-qgamma(c(alpha/2,1-alpha/2),sum(cleanData$norm_incidents) + 1/2 ,count(cleanData)$n)
+qgamma(c(alpha/2,1-alpha/2),sum(montlyIncidentsCountNormalized) + 1/2 ,incidentsCount)
 ```
 
 5) Computing mode and the highest posterior density range
@@ -179,7 +187,7 @@ ct<-min(pys[cumsum(pys)< p])
 list(hpdr=range(dy$x[py>=ct]),mode=md)
 }
 
-hpd(rgamma(1000,.5+sum(cleanData$norm_incidents),count(cleanData)$n),.95)
+hpd(rgamma(1000,.5+sum(montlyIncidentsCountNormalized),incidentsCount),.95)
 ```
 
 
