@@ -97,38 +97,40 @@ geom_abline(aes(intercept=nonInfromativeFit$coefficients[1], slope=nonInfromativ
 In this case we can see that the prior choice is important since it affects the final estimation of the parameters.
 
 ## BDA-1
+Given the exponential form: $h(y)g(\theta)e^(theta*T(y))$ we can rewrite the binomial as:
+${N \choose y} (1-\theta)^n exp(y *log(\frac{\theta}{1-\theta}))$ So clearly 
+
 
 ## BDA-2
+
+2.8a
+The solution is:
+$\theta |y \sim N( {\frac{\frac{1}{40^2}180+\frac{n}{20^2}*150}{\frac{1}{40^2} +\frac{n}{20^2}},\frac{1}{\frac{1}{40^2} +\frac{n}{20^2}}})$
+
+2.8b
+The solution is:
+$\tilde y |y \sim N( {\frac{\frac{1}{40^2}180+\frac{n}{20^2}*150}{\frac{1}{40^2} +\frac{n}{20^2}},\frac{1}{\frac{1}{40^2} +\frac{n}{20^2}}+20^2})$
+
+2.8c
+The 95% intervals are [138,163] for $\theta$ and [110,192] for $\tilde y$
+
+2.8d
+The 95% intervals are [146,154] for $\theta$ and [111,189] for $\tilde y$
 
 ## LAB-1
 
 In this dataset we have different observation times so we need to account for that.
-Since the alpha and beta values are 
+
 ```{r lab1}
 library(AER)
 data("ShipAccidents")
 summary(ShipAccidents)
 
-#clean data and retain only useful columns for our analysis
+#clean data from unobserved elements
 cleanData=ShipAccidents%>%
   filter(service>0)
 
-#normalize data (since observation times are different I need to normalize)
-min_service=cleanData%>%
-  dplyr::select(service)%>%
-  dplyr::summarise(min=min(service))
-min_service=min_service$min
-
-cleanData = cleanData%>%
-  mutate(normalization=service/min_service)%>%
-  mutate(norm_incidents = incidents/normalization)
-  
-
-#plot the normalized incidents histogram 
-ggplot(cleanData,aes(x=norm_incidents))+
-  geom_histogram(binwidth=0.01)
-
-#fit the data
+#fit the data with the proper posterior (pag 45 Gelman)
 posterior <- function(x,arrayPoisson,exposures,alpha,beta){
   alpha=alpha + sum(arrayPoisson)
   beta=beta+sum(exposures)
@@ -137,43 +139,53 @@ posterior <- function(x,arrayPoisson,exposures,alpha,beta){
   return (dgamma(x,alpha,beta))
 }
 
-#punto 2 plot numero incidenti medio al mese:
-#creo hyperparameters
-h1 = c(1,1,1,200,.5)  
-h2 = c(0.5,2,10000,2,0) 
 
-montlyIncidentsCountNormalized=cleanData$norm_incidents/min_service*100
+#creo hyperparameters, quelli usati nella scorsa esercitazione vanno cambiati in quanto estremamente distanti dal nuovo modello.
+h1 = c(5,1,10,1/2)#ultimo elemento è per la Jeffrey prior  
+h2 = c(10,2,20,0) 
+
+#show the priors: 
+xmax=1
+curve(dgamma(x,h1[1],h2[1]), from=0, to=xmax,ylim=c(0,3) , xlab="x", ylab="y",n=10000,main="Prior distributions")
+curve(dgamma(x,h1[2],h2[2]), from=0, to=xmax, xlab="x", ylab="y", add = TRUE,col = "red",n=10000)
+curve(dgamma(x,h1[3],h2[3]), from=0, to=xmax, xlab="x", ylab="y", add = TRUE,col = "green",n=10000)
+curve(x**(-1/2), from=0, to=xmax, xlab="x", ylab="y",add = TRUE,col = "yellow",n=10000)
+legend(0.8, 3,
+       legend=c("Gamma1", "Gamma2","Gamma3","Jeffreys'"),
+       col=c(1:4), lty=1, cex=0.8)
+
+incidents=cleanData$incidents
 incidentsCount=count(cleanData)$n
-for (i in 1:5)
+for (i in 1:length(h1))
 {
   if (i ==1){flag=FALSE}
   else {flag=TRUE}
   
   curve(posterior(x,cleanData$incidents,exposures = cleanData$service,h1[i],h2[i]),main="Montly posterior",col=i,add=flag, from=0, to=0.005,ylim=c(0,200) , xlab="x", ylab="y",n=10000)
 }
-legend(0.5, 8,
-       legend=c("Gamma1", "Gamma2",
-                "Gamma3", "Gamma4",
-                "Jeffreys'"),
+curve(posterior(x,cleanData$incidents,exposures = cleanData$service,h1[i],h2[i]),main="Montly posterior",col=i,add=flag, from=0, to=0.005,ylim=c(0,200) , xlab="x", ylab="y",n=10000)
+legend(0.004, 200,
+       legend=c("Gamma1", "Gamma2","Gamma3","Jeffreys'"),
        col=c(1:5), lty=1, cex=0.8)
 
 
 ```
 
+
 3) Find the posterior expectations and the maxima a posteriori (MAP) 
 
 ```{r MAP and posterior}
 ## posterior expectations
-(h1+sum(montlyIncidentsCountNormalized))/(h2+incidentsCount)
+(h1+sum(incidents))/(h2+sum(cleanData$service))
 ##MAP
-(h1+sum(montlyIncidentsCountNormalized)-1)/(h2+incidentsCount)
+(h1+sum(incidents)-1)/(h2+sum(cleanData$service))
 ```
 
 4) Constructing the 95% credibility intervals with Jeffrey prior
 
 ```{r}
 alpha=0.05
-qgamma(c(alpha/2,1-alpha/2),sum(montlyIncidentsCountNormalized) + 1/2 ,incidentsCount)
+qgamma(c(alpha/2,1-alpha/2),sum(incidents) + 1/2 ,sum(cleanData$service))
 ```
 
 5) Computing mode and the highest posterior density range
@@ -187,7 +199,7 @@ ct<-min(pys[cumsum(pys)< p])
 list(hpdr=range(dy$x[py>=ct]),mode=md)
 }
 
-hpd(rgamma(1000,.5+sum(montlyIncidentsCountNormalized),incidentsCount),.95)
+hpd(rgamma(10000,.5+sum(incidents),sum(cleanData$service)),.95)
 ```
 
 
