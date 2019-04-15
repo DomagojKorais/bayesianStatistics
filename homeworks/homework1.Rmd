@@ -97,9 +97,19 @@ geom_abline(aes(intercept=nonInfromativeFit$coefficients[1], slope=nonInfromativ
 In this case we can see that the prior choice is important since it affects the final estimation of the parameters.
 
 ## BDA-1
-Given the exponential form: $h(y)g(\theta)e^(theta*T(y))$ we can rewrite the binomial as:
-${N \choose y} (1-\theta)^n exp(y *log(\frac{\theta}{1-\theta}))$ So clearly 
+2.7a)
+Given the exponential form: $h(y)g(\theta)e^{(\eta(\theta)*T(y))}$ we can rewrite the binomial as:
+${N \choose y} (1-\theta)^n exp(y *log(\frac{\theta}{1-\theta}))$ 
+With $\eta(\theta)=log(\frac{\theta}{1-\theta}) $ as the natural parameter. 
+Now we invert this quantity and we get $\theta=\frac{e^\phi}{1+e^\phi}$.
+At this point we use the result from Gelman (pag 21) to obtain:
+$p(\theta)\propto 1*\frac{d}{d\theta}log(\frac{\theta}{1-\theta})\propto\frac{1}{\theta(1-\theta)}$
 
+2.8a)
+The posterior is 
+$$\pi(\theta|y)\propto p(y|\theta)\pi(\theta)$$
+$$\propto \theta^{y-1}(1-\theta)^{(n-y-1)}$$ 
+and this quantity has an infinite value for y=1 or y=n, so it's integral it's infinite and the distribution is improper.
 
 ## BDA-2
 
