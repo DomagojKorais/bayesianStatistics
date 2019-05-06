@@ -1,0 +1,48 @@
+---
+title: "Homework_1 - Bayesian Statistics"
+author: "Domagoj Korais"
+date: "Spring 2019"
+output: 
+  html_document:
+    toc: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(cache = TRUE)
+knitr::opts_chunk$set(message=FALSE)
+library(tidyverse)
+library(arm)
+set.seed(pi)
+```
+
+#Ex01
+```{r ex01}
+library(expm)
+#build the transition matrix
+dim=6
+diagonalValue=0.5
+offDiagonalValue=0.25
+P=diag(diagonalValue, dim, dim)
+
+
+for (row in 1:dim) {
+  for (col in 1:dim) {
+    if (row==col + 1 || col == row + 1 ) {
+      P[row,col]=0.25
+    }  
+  }
+}
+#special cases
+P[1,2] = diagonalValue
+P[6,5] = diagonalValue
+#starting vector
+val=1/dim
+start=rep(val,dim)
+#compute stationary state:
+
+final=start %*% (P %^% 10)
+print(final)  
+
+
+```
