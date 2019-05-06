@@ -1,5 +1,5 @@
 ---
-title: "Homework_1 - Bayesian Statistics"
+title: "Homework_2 - Bayesian Statistics"
 author: "Domagoj Korais"
 date: "Spring 2019"
 output: 
@@ -9,7 +9,7 @@ output:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-knitr::opts_chunk$set(cache = FALSE)
+knitr::opts_chunk$set(cache = TRUE)
 knitr::opts_chunk$set(message=FALSE)
 library(tidyverse)
 library(arm)
@@ -41,46 +41,179 @@ val=1/dim
 start=rep(val,dim)
 #compute stationary state:
 
-final=start %*% (P %^% 10)
+final=start %*% (P %^% 30)
 print(final)  
 
 
 ```
+As we can see the final probability distibution converges to the desired one.
 
 # Ex03
 ```{r ex03 }
 #Random walk
 
+
 randomWalk = function(N,d){
   x=rep(0,N)
+  count = 0
   for (i in 2:N) {
     y = x[i-1]+runif(1,-d,d)
     prob = min(1,exp( (x[i-1]^2-y^2) / 2 )) 
     u=runif(1)
+    
     if(prob>u){
+      count = count +1
+      
       x[i]=y  
     }
     else{
       x[i]=x[i-1]
     }
   }
-  return(x)
+  accRatio=count/N
+  return(list(x,accRatio))
 }
-d=10000
+d=5000
+low=d-500
 a=randomWalk(d,0.1)
+mainA="Uniform 0.1"
 b=randomWalk(d,1)
+mainB="Uniform 1"
 c=randomWalk(d,10)
-plot(a[4500:5000], type="l", ylab="Trace", xlab="Iteration")
-plot(b[4500:5000], type="l", ylab="Trace", xlab="Iteration")
-plot(c[4500:5000], type="l", ylab="Trace", xlab="Iteration")
-hist(a, breaks=100, border="gray40",freq=F, main="",xlim = c(-4,4))
+mainC="Uniform 10"
+par(mfrow=c(1,3))
+print("Uniform case acceptance ratio: ")
+print(c(a[[2]],b[[2]],c[[2]]))
+plot(a[[1]][low:d], type="l", ylab="Trace", xlab="Iteration",main = mainA)
+plot(b[[1]][low:d], type="l", ylab="Trace", xlab="Iteration",main = mainB)
+plot(c[[1]][low:d], type="l", ylab="Trace", xlab="Iteration",main = mainC)
+hist(a[[1]], breaks=100, border="gray40",freq=F, main=mainA,xlim = c(-4,4))
 curve(dnorm(x),add=TRUE,col="red")
-hist(b, breaks=100, border="gray40",freq=F, main="",xlim = c(-4,4))
+hist(b[[1]], breaks=100, border="gray40",freq=F, main = mainB,xlim = c(-4,4))
 curve(dnorm(x),add=TRUE,col="red")
-hist(c, breaks=100, border="gray40",freq=F, main="",,xlim = c(-4,4))
+hist(c[[1]], breaks=100, border="gray40",freq=F, main= mainC,xlim = c(-4,4))
 curve(dnorm(x),add=TRUE,col="red")
-acf(a, main="")
-acf(b, main="")
-acf(c, main="")
+acf(a[[1]], main=mainA)
+acf(b[[1]], main=mainB)
+acf(c[[1]], main=mainC)
+library(distr)
+randomWalkLaplace = function(N,lambda){
+  x=rep(0,N)
+  count=0
+  for (i in 2:N) {
+    y = x[i-1]+r(DExp(lambda))(1)
+    prob = min(1,exp( (x[i-1]^2-y^2) / 2 )) 
+    u=runif(1)
+    
+    if(prob>u){
+      count = count +1
+      x[i]=y  
+    }
+    else{
+      x[i]=x[i-1]
+    }
+  }
+   accRatio=count/N
+  return(list(x,accRatio))
+}
+
+d=5000
+low=d-500
+a=randomWalkLaplace(d,0.1)
+mainA="Laplace 0.1"
+b=randomWalkLaplace(d,1)
+mainB="Laplace 1"
+c=randomWalkLaplace(d,10)
+mainC="Laplace 10"
+par(mfrow=c(1,3))
+print("Laplace case acceptance ratio: ")
+print(c(a[[2]],b[[2]],c[[2]]))
+plot(a[[1]][low:d], type="l", ylab="Trace", xlab="Iteration",main = mainA)
+plot(b[[1]][low:d], type="l", ylab="Trace", xlab="Iteration",main = mainB)
+plot(c[[1]][low:d], type="l", ylab="Trace", xlab="Iteration",main = mainC)
+hist(a[[1]], breaks=100, border="gray40",freq=F, main=mainA,xlim = c(-4,4))
+curve(dnorm(x),add=TRUE,col="red")
+hist(b[[1]], breaks=100, border="gray40",freq=F, main = mainB,xlim = c(-4,4))
+curve(dnorm(x),add=TRUE,col="red")
+hist(c[[1]], breaks=100, border="gray40",freq=F, main= mainC,xlim = c(-4,4))
+curve(dnorm(x),add=TRUE,col="red")
+acf(a[[1]], main=mainA)
+acf(b[[1]], main=mainB)
+acf(c[[1]], main=mainC)
+
+randomWalkCauchy = function(N,scale){
+  x=rep(0,N)
+  count=0
+  for (i in 2:N) {
+    y = x[i-1]+rcauchy(1,0,scale)
+    prob = min(1,exp( (x[i-1]^2-y^2) / 2 )) 
+    u=runif(1)
+   
+    if(prob>u){
+      count = count +1
+      x[i]=y  
+    }
+    else{
+      x[i]=x[i-1]
+    }
+  }
+   accRatio=count/N
+  return(list(x,accRatio))
+}
+
+d=5000
+low=d-500
+a=randomWalkCauchy(d,0.1)
+mainA="Cauchy 0.1"
+b=randomWalkCauchy(d,1)
+mainB="Cauchy 1"
+c=randomWalkCauchy(d,10)
+mainC="Cauchy 10"
+par(mfrow=c(1,3))
+print("Cauchy case acceptance ratio: ")
+print(c(a[[2]],b[[2]],c[[2]]))
+plot(a[[1]][low:d], type="l", ylab="Trace", xlab="Iteration",main = mainA)
+plot(b[[1]][low:d], type="l", ylab="Trace", xlab="Iteration",main = mainB)
+plot(c[[1]][low:d], type="l", ylab="Trace", xlab="Iteration",main = mainC)
+hist(a[[1]], breaks=100, border="gray40",freq=F, main=mainA,xlim = c(-4,4))
+curve(dnorm(x),add=TRUE,col="red")
+hist(b[[1]], breaks=100, border="gray40",freq=F, main = mainB,xlim = c(-4,4))
+curve(dnorm(x),add=TRUE,col="red")
+hist(c[[1]], breaks=100, border="gray40",freq=F, main= mainC,xlim = c(-4,4))
+curve(dnorm(x),add=TRUE,col="red")
+acf(a[[1]], main=mainA)
+acf(b[[1]], main=mainB)
+acf(c[[1]], main=mainC)
 
 ```
+
+Comments:
+
+a) From the autocorrelation point of view the  best choice looks to be the Uniform 01 since the autocorrelation function decreases faster.
+
+b) The choice of the distribution looks quite unimportant to me, much more important is an optimal choice of parameters.
+
+c) Let's do some grid search of the hyperparameters:
+
+As we can check from the computed values To reach a 25% acceptance ratio the values for the distributions are the following: For the uniform a value between 5 and 6, For Cauchy a value between 3 and 4 and for Laplace a value between 0.2 and 0.3.
+```{r}
+#get a 0.25 acc ratio
+N=1000
+for (i in 1:10) {
+  print(paste0("value: ", i))
+  print(randomWalk(N,i)[[2]])
+  print(randomWalkCauchy(N,i)[[2]])
+  print(randomWalkLaplace(N,i)[[2]])
+  
+}
+for (i in 1:10) {
+  j=i*0.1
+  print(paste0("value: ", j))
+  print(randomWalk(N,j)[[2]])
+  print(randomWalkCauchy(N,j)[[2]])
+  print(randomWalkLaplace(N,j)[[2]])
+  
+}
+
+```
+
