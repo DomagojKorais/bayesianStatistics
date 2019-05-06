@@ -13,3 +13,6 @@ Matrix
 lme4
 arm
 expm
+mvtnorm
+cluster
+gclus

@@ -9,7 +9,7 @@ output:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-knitr::opts_chunk$set(cache = TRUE)
+knitr::opts_chunk$set(cache = FALSE)
 knitr::opts_chunk$set(message=FALSE)
 library(tidyverse)
 library(arm)
@@ -44,5 +44,43 @@ start=rep(val,dim)
 final=start %*% (P %^% 10)
 print(final)  
 
+
+```
+
+# Ex03
+```{r ex03 }
+#Random walk
+
+randomWalk = function(N,d){
+  x=rep(0,N)
+  for (i in 2:N) {
+    y = x[i-1]+runif(1,-d,d)
+    prob = min(1,exp( (x[i-1]^2-y^2) / 2 )) 
+    u=runif(1)
+    if(prob>u){
+      x[i]=y  
+    }
+    else{
+      x[i]=x[i-1]
+    }
+  }
+  return(x)
+}
+d=10000
+a=randomWalk(d,0.1)
+b=randomWalk(d,1)
+c=randomWalk(d,10)
+plot(a[4500:5000], type="l", ylab="Trace", xlab="Iteration")
+plot(b[4500:5000], type="l", ylab="Trace", xlab="Iteration")
+plot(c[4500:5000], type="l", ylab="Trace", xlab="Iteration")
+hist(a, breaks=100, border="gray40",freq=F, main="",xlim = c(-4,4))
+curve(dnorm(x),add=TRUE,col="red")
+hist(b, breaks=100, border="gray40",freq=F, main="",xlim = c(-4,4))
+curve(dnorm(x),add=TRUE,col="red")
+hist(c, breaks=100, border="gray40",freq=F, main="",,xlim = c(-4,4))
+curve(dnorm(x),add=TRUE,col="red")
+acf(a, main="")
+acf(b, main="")
+acf(c, main="")
 
 ```
