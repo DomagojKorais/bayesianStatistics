@@ -87,20 +87,20 @@ print(fit_P_real_data, pars = c('alpha','beta'))
 ## ----hist_simple_P-------------------------------------------------------
 mcmc_hist(as.matrix(fit_P_real_data, pars = c('alpha','beta')))
 mcmc_scatter(as.matrix(fit_P_real_data, pars = c('alpha','beta')), alpha = 0.2)
-
+# il fatto che alpha e beta siano correlate è la prova del fatto che complaints e traps sono correlate, perchè?
 
 ## ------------------------------------------------------------------------
 ## posterior predictive checking
 y_rep <- as.matrix(fit_P_real_data, pars = "y_rep")
 ppc_dens_overlay(y = stan_dat_simple$complaints, y_rep[1:200,])
-
+#da qui vediamo che il modello simulato presenta una varianza inferiore alla reale
 
 ## ------------------------------------------------------------------------
 ## standardised residuals of the observed vs predicted number of complaints
 mean_y_rep <- colMeans(y_rep)
 std_resid <- (stan_dat_simple$complaints - mean_y_rep) / sqrt(mean_y_rep)
 qplot(mean_y_rep, std_resid) + hline_at(2) + hline_at(-2)
-
+#residui per lo più positivi=> modello sottostima
 
 ## ------------------------------------------------------------------------
 ggplot(pest_data, aes(x = log(total_sq_foot), y = log1p(complaints))) + 
@@ -110,8 +110,8 @@ ggplot(pest_data, aes(x = log(total_sq_foot), y = log1p(complaints))) +
 
 ## ------------------------------------------------------------------------
 ## add the two variables to the list of the data
-stan_dat_simple$log_sq_foot <- log(pest_data$total_sq_foot/1e4)
-stan_dat_simple$live_in_super <- pest_data$live_in_super
+stan_dat_simple$area <- log(pest_data$total_sq_foot/1e4)
+stan_dat_simple$super <- pest_data$live_in_super
 str(stan_dat_simple)
 
 
@@ -124,7 +124,7 @@ comp_model_P_mult <- stan_model('multiple_poisson_regression.stan')
 fit_model_P_mult_real <- sampling(comp_model_P_mult, data = stan_dat_simple)
 y_rep <- as.matrix(fit_model_P_mult_real, pars = "y_rep")
 ppc_dens_overlay(stan_dat_simple$complaints, y_rep[1:200,])
-
+#più o meno abbiamo gli stessi problemi di prima(dobbiamo rilassare l'ipotesi sulla varianza = media)
 ## ------------------------------------------------------------------------
 ppc_intervals(
   y = stan_dat_simple$complaints, 
