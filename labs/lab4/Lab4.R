@@ -135,6 +135,7 @@ ppc_intervals(
 
 
 ## ---- cache=TRUE, results="hide", message=FALSE--------------------------
+#per risolvere il problema della varianza bisogna usare una binomiale negativa
 comp_model_NB <- stan_model('multiple_NB_regression.stan')
 
 
@@ -144,6 +145,7 @@ samps_NB <- rstan::extract(fitted_model_NB)
 
 
 ## ----ppc-full------------------------------------------------------------
+#ppc posterior predictive check
 ## predictions vs. the data
 y_rep <- samps_NB$y_rep
 ppc_dens_overlay(stan_dat_simple$complaints, y_rep[1:200,])
@@ -176,3 +178,5 @@ ppc_stat_grouped(
   binwidth = 0.2
 )
 
+
+#bisogna fare un modello gerarchico che tenga in considerazione il fatto che i dati arrivano da palazzi diversi
