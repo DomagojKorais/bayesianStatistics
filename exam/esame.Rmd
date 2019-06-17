@@ -1,0 +1,121 @@
+---
+title: "exam"
+author: "Domagoj Korais"
+date: "June 17, 2019"
+output: 
+  html_document:
+    toc: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(cache = TRUE)
+knitr::opts_chunk$set(message=FALSE)
+library(tidyverse)
+
+set.seed(pi)
+```
+
+# Dataset description
+
+This dataset describes the mortality rate of malignent melanoma in a bunch of European countries. The reference for the used dataset is the following: 
+
+<blockquote>
+<p>Langford, I.H., Bentham, G. and McDonald, A. (1998). Multilevel modelling of geographically aggregated health data: a case study on malignant melanoma mortality and UV exposure in the European community. <em>Statistics in Medicine</em>, <em>17</em>, 41-58.</p>
+</blockquote>
+
+There is a total of six variables:
+<ul>
+<li><code>nation</code> a factor with levels <code>Belgium</code>, <code>W.Germany</code>, <code>Denmark</code>, <code>France</code>, <code>UK</code>, <code>Italy</code>, <code>Ireland</code>, <code>Luxembourg</code>, and <code>Netherlands</code></li>
+<li><code>region</code> Region ID - a factor</li>
+<li><code>county</code> County ID - a factor</li>
+<li><code>deaths</code> Number of male deaths due to malignant melanoma during 1971-1980</li>
+<li><code>expected</code> Number of expected deaths</li>
+<li><code>uvb</code> Centered measure of the UVB dose reaching the earth’s surface in each county.</li>
+</ul>
+
+The data are geographically hierarchical, since nations are divided in regions, and regions are divedid in counties. 
+
+
+## Exploratory data analysis
+```{r eda}
+library(mlmRev)
+library(tidyverse)
+data = Mmmec
+
+globalNationData = data%>%
+  group_by(nation)%>%
+  summarize(total=sum(deaths),
+            total_expected=sum(expected),
+            mean_uvb=mean(uvb),
+            sd_uvb = sd(uvb))%>%
+  mutate(delta=total-total_expected)%>%
+  arrange(desc(delta))
+#plot
+ggplot(data,aes(x=nation,y=uvb))+
+  geom_boxplot()+
+  ggtitle("Uvb in nations")
+
+
+
+
+#plot global data
+ggplot(data = globalNationData,aes(x=mean_uvb,y=delta,color=nation))+
+  geom_point()+
+  ggtitle("Residuals vs mean uvb at national level ")
+
+globalRegionData = data%>%
+  group_by(region)%>%
+  summarize(total=sum(deaths),
+            total_expected=sum(expected),
+            mean_uvb=median(uvb),
+            sd_uvb = sd(uvb))%>%
+  mutate(delta=total-total_expected)%>%
+  arrange(desc(delta))
+globalRegionData = inner_join(globalRegionData,data,"region")
+#plot global  data
+ggplot(data = globalRegionData,aes(x=mean_uvb,y=delta,color = nation))+
+  geom_point()+
+  ggtitle("Residuals vs median uvb at regional level ")
+
+ggplot(data = globalRegionData,aes(x=mean_uvb,y=total,color = nation))+
+  geom_point()+
+  ggtitle("Total deaths vs median uvb at regional level ")
+
+topRegions = data%>%group_by(region)%>%summarize(total=sum(deaths),count = n())%>%arrange(desc(total))%>%top_n(10,wt=total)
+
+
+
+data%>%group_by(county)%>%count() #no repetitions
+totalDeaths = data%>%summarize(total=sum(deaths))
+#countries with top regions
+inner_join(data,topRegions,by = "region")%>%arrange(desc(total))
+#number of deaths from top regions
+
+ggplot(data,aes(x=uvb,y=deaths,color=nation))+
+  geom_point()
+
+
+
+```
+
+```{r population}
+
+populationbycountry19802010millions <- read_csv("/home/doma/Downloads/populationbycountry19802010millions.csv")
+#rename Western Germany
+filter(populationbycountry19802010millions,X1 =="Germany, West")
+
+populationbycountry19802010millions = populationbycountry19802010millions%>%mutate(X1 =replace(X1,X1=="Germany, West","W.Germany"))
+population = populationbycountry19802010millions%>%rename(nation=X1,population = '1980')%>%select(nation,population)
+data = inner_join(population,data,by=c("nation"="nation"))
+
+```
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
