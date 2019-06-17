@@ -9,7 +9,7 @@ output:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-knitr::opts_chunk$set(cache = TRUE)
+knitr::opts_chunk$set(cache = FALSE)
 knitr::opts_chunk$set(message=FALSE)
 library(tidyverse)
 
@@ -34,13 +34,15 @@ There is a total of six variables:
 <li><code>uvb</code> Centered measure of the UVB dose reaching the earth’s surface in each county.</li>
 </ul>
 
-The data are geographically hierarchical, since nations are divided in regions, and regions are divedid in counties. 
+The data are geographically nested, since nations are divided in regions, and regions are divided in counties. 
+To be able to compare different nations I decided to include population data of the countries, to be able to compare death ratio instead of raw counts.
 
 
 ## Exploratory data analysis
 ```{r eda}
 library(mlmRev)
 library(tidyverse)
+library(GGally)
 data = Mmmec
 
 globalNationData = data%>%
@@ -99,23 +101,46 @@ ggplot(data,aes(x=uvb,y=deaths,color=nation))+
 
 ```
 
+# Integrate with population of country
+The population data are taken from the following dataset and are related to the 1980 year: 
+https://openei.org/doe-opendata/dataset/a7fea769-691d-4536-8ed3-471e993a2445
+
 ```{r population}
 
-populationbycountry19802010millions <- read_csv("/home/doma/Downloads/populationbycountry19802010millions.csv")
-#rename Western Germany
+populationbycountry19802010millions <- read_csv("populationbycountry19802010millions.csv", 
+    col_types = cols(`1980` = col_double()))
+
+#rename Western Germany to make in compatible with our data
 filter(populationbycountry19802010millions,X1 =="Germany, West")
 
 populationbycountry19802010millions = populationbycountry19802010millions%>%mutate(X1 =replace(X1,X1=="Germany, West","W.Germany"))
-population = populationbycountry19802010millions%>%rename(nation=X1,population = '1980')%>%select(nation,population)
-data = inner_join(population,data,by=c("nation"="nation"))
+
+pop = populationbycountry19802010millions%>%select(nation=X1,population = '1980')
+
+data_complete = inner_join(pop,data,by=c("nation"="nation"))
+summary(data_complete)
 
 ```
-## Including Plots
 
-You can also embed plots, for example:
+#Let's compute the death ratio
+```{r death_ratio}
+data_complete=mutate(data_complete,ratio = (deaths)/population,residuals = (deaths-expected)/population)
+#And now let's rock with ratios
+ggplot(data_complete,aes(x=nation,y=ratio,color=nation))+
+  geom_boxplot()
 
-```{r pressure, echo=FALSE}
-plot(pressure)
+ggplot(data_complete,aes(x=uvb,y=log2(ratio),color=nation))+
+  geom_point()
+
+
+dataReduced = data_complete %>%select(-c(region,county))
+ggpairs( dataReduced ) 
+
+
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+```{R}
+#Let's try a Poisson regression
+fit <- glm(deaths ~region, data=data_complete, family=poisson())
+summary(fit)
+```
