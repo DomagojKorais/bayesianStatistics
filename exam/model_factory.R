@@ -4,6 +4,7 @@ library(mlmRev)
 library(GGally)
 library(rstanarm)
 library(bayesplot) 
+library(loo)
 
 
 #prepare data
@@ -53,11 +54,70 @@ compare_fits = function (fit,title,data){
     theme(axis.title.x = element_text(size=16),
           axis.title.y = element_text(size=16))
   }
-compare_fits(fit1,"uvb",data=data_complete2)
-compare_fits(fit2,"uvb + nation",data=data_complete2)
-compare_fits(fit3,"uvb + nation + offset(local_male_population)",data=data_complete2)
-compare_fits(fit4,"deaths ~ uvb + nation + region",data=data_complete2)
-compare_fits(fit5,"deaths ~ uvb + nation + region + offset(local_male_population)",data=data_complete2)
-compare_fits(fit6,"deaths ~ uvb + region",data=data_complete2)
-compare_fits(fit7,"deaths ~ uvb + region + offset(local_male_population)",data=data_complete2)
+compare_fits(fit1,"1 uvb",data=data_complete2)
+compare_fits(fit2,"2 uvb + nation",data=data_complete2)
+compare_fits(fit3,"3 uvb + nation + offset(local_male_population)",data=data_complete2)
+compare_fits(fit4,"4 deaths ~ uvb + nation + region",data=data_complete2)
+compare_fits(fit5,"5 deaths ~ uvb + nation + region + offset(local_male_population)",data=data_complete2)
+compare_fits(fit6,"6 deaths ~ uvb + region",data=data_complete2)
+compare_fits(fit7,"7 deaths ~ uvb + region + offset(local_male_population)",data=data_complete2)
+
+#MODEL COMPARISON
+#loo
+loo_1  = loo(fit1)
+loo_2  = loo(fit2)
+loo_3  = loo(fit3)
+loo_4  = loo(fit4)
+loo_5  = loo(fit5)
+loo_6  = loo(fit6)
+loo_7  = loo(fit7)
+loo_diff = compare(loo_1,loo_2,loo_3,loo_4,loo_5,loo_6,loo_7)
+loo_diff
+#waic
+
+waic_1  = waic(fit1)
+waic_2  = waic(fit2)
+waic_3  = waic(fit3)
+waic_4  = waic(fit4)
+waic_5  = waic(fit5)
+waic_6  = waic(fit6)
+waic_7  = waic(fit7)
+waic_diff = compare(waic_1,waic_2,waic_3,waic_4,waic_5,waic_6,waic_7)
+waic_diff
+
+#hierarchical models! =) let's check if we can do better, hierarchy is nation>region
+comp_model_NB_hier <- stan_model('hierarchical_NB_regression.stan')
+
+N_nations=8 #DEVI TRASFORMARE IL FACTOR NAZIONE IN INTEGER
+#nation_data=
+nation_idx=seq(1,N_nations)
+data3=data_complete2%>%mutate(
+  nation_fac = factor(nation, levels = unique(nation)),
+  nation_idx = as.integer(nation_fac)
+)
+  #prepare data
+stan_dat_hier =
+  with(data3,
+       list(deaths = deaths,
+            uvb = uvb,
+            N = length(deaths),
+            J = N_nations,
+            K = 2,
+            nation_idx = nation_idx
+       )
+  )
+#RUN MODEL
+fitted_model_NB_hier <- sampling(comp_model_NB_hier, data = stan_dat_hier,
+                                 chains = 4, cores = 4, iter = 4000)
+samps_hier_NB <- rstan::extract(fitted_model_NB_hier)
+print(fitted_model_NB_hier, pars = c('sigma_mu','beta','alpha','phi','mu'))
+plot(fitted_model_NB_hier)
+
+
+y_rep <- as.matrix(fitted_model_NB_hier, pars = "y_rep")
+mean_y_rep <- colMeans(y_rep)
+mean_inv_phi <- mean(as.matrix(fitted_model_NB_hier, pars = "inv_phi"))
+std_resid <- (stan_dat_hier$deaths - mean_y_rep) / sqrt(mean_y_rep + mean_y_rep^2*mean_inv_phi)
+qplot(mean_y_rep, std_resid) + hline_at(2) + hline_at(-2)
+
 
