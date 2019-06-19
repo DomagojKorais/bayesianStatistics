@@ -1,0 +1,9 @@
+fit1 <- stan_glm(deaths ~ uvb , data=data_complete2, family=neg_binomial_2(),cores=2)
+fit2 <- stan_glm(deaths ~ uvb + nation , data=data_complete2, family=neg_binomial_2(),cores=4)
+fit3 <- stan_glm(deaths ~ uvb + nation + offset(local_male_population) , data=data_complete2, family=neg_binomial_2(),cores=4)
+fit4 <- stan_glm(deaths ~ uvb + nation + region, data=data_complete2, family=neg_binomial_2(),cores=4)
+fit5 <- stan_glm(deaths ~ uvb + nation + region  + offset(local_male_population), data=data_complete2, family=neg_binomial_2(),cores=4)
+fit6 <- stan_glm(deaths ~ uvb + region , data=data_complete2, family=neg_binomial_2(),cores=4)
+fit7 <- stan_glm(deaths ~ uvb + region + offset(local_male_population), data=data_complete2, family=neg_binomial_2(),cores=4)
+
+
