@@ -58,8 +58,12 @@ ggplot(data,aes(x=nation,y=uvb))+
   geom_boxplot()+
   ggtitle("Uvb in nations")
 
+ggplot(data,aes(x=nation,y=deaths))+
+  geom_boxplot()+
+  ggtitle("deaths in nations")
 
 
+summarise(data)
 
 #plot global data
 ggplot(data = globalNationData,aes(x=mean_uvb,y=delta,color=nation))+
@@ -119,7 +123,7 @@ pop = populationbycountry19802010millions%>%select(nation=X1,population = '1980'
 
 data_complete = inner_join(pop,data,by=c("nation"="nation"))
 summary(data_complete)
-
+sd(data_complete$deaths)
 ```
 
 #Let's compute the death ratio
@@ -138,9 +142,154 @@ ggpairs( dataReduced )
 
 
 ```
+# Compute the death ratio for region
+```{r }
+nation = data%>%group_by(nation)%>%summarise(tot_expected=sum(expected))
+nation_complete = inner_join(pop,nation,by=c("nation"="nation"))
+male_nation_complete = nation_complete%>%mutate(male_population=population/2)%>%select(-population)
+data_complete2 = inner_join(male_nation_complete,data,by=c("nation"="nation"))
+data_complete2 = data_complete2%>%mutate(local_male_population=(male_population*expected)/tot_expected)
+data_complete2 = data_complete2%>%mutate(local_rate = (deaths)/(local_male_population))
+ggplot(data_complete2,aes(x=local_rate))+
+  geom_histogram()
+
+ggplot(data_complete2,aes(x=deaths))+
+  geom_histogram()
+dataReduced = data_complete2 %>%select(-c(region,county))
+ggpairs( dataReduced ) 
+```
 
 ```{R}
-#Let's try a Poisson regression
-fit <- glm(deaths ~region, data=data_complete, family=poisson())
-summary(fit)
+#Let's try a Poisson regression with ungrouped data, using nation as a regressor for rate
+library(rstanarm)
+library(bayesplot) 
+
+fit <- stan_glm(deaths ~ uvb + nation + region , data=data_complete, family=neg_binomial_2(),cores=2)
+saveRDS(fit,"models/fit.stanModel")
+a=readRDS("models/fit.stanModel")
+summary(a)
+posterior <- as.array(fit)
+dim(posterior)
+mcmc_areas(posterior)
+mcmc_intervals(posterior)
+mcmc_hist(posterior)
+mcmc_scatter(posterior, pars = c("(Intercept)","nationItaly"))
+mcmc_trace(posterior)
+mcmc_parcoord(posterior)
+mcmc_pairs(posterior)
+yrep_poisson <- posterior_predict(fit, draws = 500)
+y=data_complete$deaths
+y
+data_complete$deaths
+ppc_stat(y,yrep_poisson)
+ppc_stat_grouped(y,yrep_poisson,group=data_complete$nation)+
+  ggtitle("Using raw counts ")
+
+ppc_stat_grouped(y,yrep_poisson,group=data_complete$nation, stat="sd")+
+  ggtitle("Using raw counts sd comparison")
+ppc_dens_overlay(y,yrep_poisson)
+dim(y)
+```
+
+
+```{R}
+#Let's try a Poisson regression with ungrouped data, using nation as a regressor for rate
+library(rstanarm)
+library(bayesplot) 
+
+fit3 <- stan_glm(deaths ~ uvb + nation, data=data_complete, family=neg_binomial_2(),cores=2)
+summary(fit3)
+posterior <- as.array(fit3)
+dim(posterior)
+mcmc_areas(posterior)
+mcmc_intervals(posterior)
+mcmc_hist(posterior)
+mcmc_scatter(posterior, pars = c("(Intercept)","nationItaly"))
+mcmc_trace(posterior)
+mcmc_parcoord(posterior)
+mcmc_pairs(posterior)
+yrep_poisson <- posterior_predict(fit3, draws = 500)
+y=data_complete$deaths
+y
+data_complete$deaths
+ppc_stat(y,yrep_poisson)
+ppc_stat_grouped(y,yrep_poisson,group=data_complete$nation)+
+  ggtitle("Using raw counts ")
+
+ppc_stat_grouped(y,yrep_poisson,group=data_complete$nation, stat="sd")+
+  ggtitle("Using raw counts sd comparison")
+ppc_dens_overlay(y,yrep_poisson)
+dim(y)
+
+#residuals
+
+
+
+
+
+```
+```{R}
+#Let's try a Poisson regression with ungrouped data, using nation as a regressor for rate on the rates!
+library(rstanarm)
+library(bayesplot) 
+
+fit2 <- stan_glm(deaths ~ uvb + nation + offset(male_population) , data=data_complete2, family=neg_binomial_2(),cores=2)
+saveRDS(fit2,"models/fit2.stanModel")
+summary(fit2)
+posterior <- as.array(fit2)
+dim(posterior)
+mcmc_areas(posterior)
+mcmc_intervals(posterior)
+mcmc_hist(posterior)
+mcmc_scatter(posterior, pars = c("(Intercept)","nationItaly"))
+mcmc_trace(posterior)
+mcmc_parcoord(posterior)
+mcmc_pairs(posterior)
+yrep_poisson <- posterior_predict(fit2, draws = 500)
+y=data_complete2$deaths
+y
+data_complete$deaths
+ppc_stat(y,yrep_poisson)
+ppc_stat_grouped(y,yrep_poisson,group=data_complete$nation)+
+  ggtitle("Using exposures means comparison")
+
+ppc_stat_grouped(y,yrep_poisson,group=data_complete$nation, stat="sd")+
+  ggtitle("Using exposures sd comparison")
+ppc_dens_overlay(y,yrep_poisson)
+dim(y)
+```
+
+```{r}
+
+compare_fits = function (fit,title_mean,title_sd,title_overlay,data){
+  posterior <- as.array(fit)
+  yrep_poisson <- posterior_predict(fit, draws = 500)
+  y=data$deaths
+  
+  # ppc_stat_grouped(y,yrep_poisson,group=data$nation)+
+  #   ggtitle(title_mean)
+
+  #ppc_stat_grouped(y,yrep_poisson,group=data$nation, stat="sd")+
+  #  ggtitle(title_sd)
+  # 
+  # ppc_dens_overlay(y,yrep_poisson)+
+  #   ggtitle(title_overlay)
+  #  ppc_stat_2d(y,yrep_poisson)+
+   # ggtitle(title_sd)
+    
+    mean_y_rep <- colMeans(yrep_poisson)
+std_resid <- (y - mean_y_rep) / sqrt(mean_y_rep)
+qplot(mean_y_rep, std_resid) + hline_at(2) + hline_at(-2)+
+  labs(x="Mean of y_rep", y= "Stand. residuals")+
+  xaxis_text(on =TRUE, size=22)+
+  yaxis_text(on =TRUE, size=22)+
+    theme(axis.title.x = element_text(size=16),
+          axis.title.y = element_text(size=16))
+  
+}
+
+compare_fits(fit,"raw count mean","raw count sd","raw overlay",data=data_complete2)
+compare_fits(fit2,"exposure count mean","esposure count sd","exposure overlay",data=data_complete2)
+compare_fits(fit3,"only uvb mean","only uvb count sd","only uvb overlay",data=data_complete2)
+  
 ```
