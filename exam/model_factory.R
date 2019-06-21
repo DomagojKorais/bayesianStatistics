@@ -120,7 +120,7 @@ stan_dat_hier_9 =
             population = log(local_male_population)
        )
   )
-#RUN MODEL
+#RUN MODEL grouped on nations
 model9 = stan_model("fit9.stan")S
 
 fitted_9 <- sampling(model9, data = stan_dat_hier_9,
@@ -153,7 +153,7 @@ std_resid <- (stan_dat_hier$deaths - mean_y_rep) / sqrt(mean_y_rep + mean_y_rep^
 qplot(mean_y_rep, std_resid) + hline_at(2) + hline_at(-2)
 
 
-#RUN MODEL 10
+#RUN MODEL 10 simple grouped on regions
 #prepare data
 stan_dat_hier_10 =
   with(data3,
@@ -198,6 +198,114 @@ mean_y_rep <- colMeans(y_rep)
 mean_inv_phi <- mean(as.matrix(fitted_10, pars = "inv_phi"))
 std_resid <- (stan_dat_hier$deaths - mean_y_rep) / sqrt(mean_y_rep + mean_y_rep^2*mean_inv_phi)
 qplot(mean_y_rep, std_resid) + hline_at(2) + hline_at(-2)
+
+#RUN MODEL 11 double nested
+#prepare data
+stan_dat_hier_11 =
+  with(data3,
+       list(deaths = deaths,
+            uvb = uvb,
+            N = length(deaths),
+            J = length(unique(region)),
+            L = length(unique(nation)),
+            K = 2,
+            #region_idx = as.integer(unique(region)),
+            region_fac = factor(region, levels = unique(region)),
+            region_idx = as.integer(factor(region, levels = unique(region))),
+            nation_fac = factor(nation, levels = unique(nation)),
+            nation_idx = as.integer(factor(nation, levels = unique(nation))),
+            population = log(local_male_population)
+       )
+  )
+model11 = stan_model("fit11.stan")
+
+fitted_11 <- sampling(model11, data = stan_dat_hier_11,
+                      chains = 4, cores = 4, iter = 4000, verbose=TRUE)
+samps_hier_11 <- rstan::extract(fitted_11)
+saveRDS(fitted_11,"models/fit11.stanModel")
+
+print(fitted_11, pars = c('sigma_mu','beta','alpha','phi','mu'))
+plot(fitted_11)
+pairs(fitted_11)
+
+
+
+y_rep <- as.matrix(fitted_11, pars = "y_rep")
+y=data_complete2$deaths
+ppc_stat(y,y_rep,stat="sd")
+
+ppc_stat_grouped(y,y_rep,group=data_complete$nation,stat="mean")+
+  ggtitle("Using exposures means comparison")
+
+
+
+#y_rep <- posterior_predict(fit3, draws = 500)
+ppc_stat_grouped(y,y_rep,group=data_complete$nation,stat="sd")+
+  ggtitle("Using exposures sd comparison")
+
+mean_y_rep <- colMeans(y_rep)
+
+mean_inv_phi <- mean(as.matrix(fitted_11, pars = "inv_phi"))
+std_resid <- (stan_dat_hier$deaths - mean_y_rep) / sqrt(mean_y_rep + mean_y_rep^2*mean_inv_phi)
+qplot(mean_y_rep, std_resid) + hline_at(2) + hline_at(-2)
+
+#RUN MODEL 12 VARYING INTERCEPT AND SLOPE
+#prepare model matrix data
+group_data = data.frame(stan_dat_hier_11)%>%
+  group_by(nation_idx)%>%
+  summarise(uvb=mean(uvb))%>%
+  select(nation_idx,uvb)
+
+
+stan_dat_hier_12 =
+  with(data3,
+       list(deaths = deaths,
+            uvb = uvb,
+            N = length(deaths),
+            L = length(unique(region)),
+            J = length(unique(nation)),
+            K = 2,
+            #region_idx = as.integer(unique(region)),
+            region_fac = factor(region, levels = unique(region)),
+            region_idx = as.integer(factor(region, levels = unique(region))),
+            nation_fac = factor(nation, levels = unique(nation)),
+            nation_idx = as.integer(factor(nation, levels = unique(nation))),
+            group_data = group_data,
+            population = log(local_male_population)
+       )
+  )
+model12 = stan_model("fit12.stan")
+
+fitted_12 <- sampling(model12, data = stan_dat_hier_12,
+                      chains = 1, cores = 4, iter = 4000, verbose=TRUE)
+samps_hier_12 <- rstan::extract(fitted_12)
+saveRDS(fitted_12,"models/fit12.stanModel")
+
+print(fitted_12, pars = c('sigma_mu','beta','alpha','phi','mu'))
+plot(fitted_12)
+pairs(fitted_12)
+
+
+
+y_rep <- as.matrix(fitted_12, pars = "y_rep")
+y=data_complete2$deaths
+ppc_stat(y,y_rep,stat="sd")
+
+ppc_stat_grouped(y,y_rep,group=data_complete$nation,stat="mean")+
+  ggtitle("Using exposures means comparison")
+
+
+
+#y_rep <- posterior_predict(fit3, draws = 500)
+ppc_stat_grouped(y,y_rep,group=data_complete$nation,stat="sd")+
+  ggtitle("Using exposures sd comparison")
+
+mean_y_rep <- colMeans(y_rep)
+
+mean_inv_phi <- mean(as.matrix(fitted_12, pars = "inv_phi"))
+std_resid <- (stan_dat_hier$deaths - mean_y_rep) / sqrt(mean_y_rep + mean_y_rep^2*mean_inv_phi)
+qplot(mean_y_rep, std_resid) + hline_at(2) + hline_at(-2)
+
 
 
 
