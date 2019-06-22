@@ -8,7 +8,7 @@ output:
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = FALSE)
 knitr::opts_chunk$set(cache = FALSE)
 knitr::opts_chunk$set(message=FALSE)
 library(tidyverse)
@@ -18,7 +18,8 @@ set.seed(pi)
 
 # Dataset description
 
-This dataset describes the mortality rate of malignent melanoma in a bunch of European countries. The reference for the used dataset is the following: 
+This dataset describes the mortality rate of malignent melanoma in eight European countries.
+The reference for the used dataset is the following: 
 
 <blockquote>
 <p>Langford, I.H., Bentham, G. and McDonald, A. (1998). Multilevel modelling of geographically aggregated health data: a case study on malignant melanoma mortality and UV exposure in the European community. <em>Statistics in Medicine</em>, <em>17</em>, 41-58.</p>
@@ -35,7 +36,8 @@ There is a total of six variables:
 </ul>
 
 The data are geographically nested, since nations are divided in regions, and regions are divided in counties. 
-To be able to compare different nations I decided to include population data of the countries, to be able to compare death ratio instead of raw counts.
+A county is the smallest area forwich we have data.
+To be able to compare different nations I decided to include population data of the countries, this made possible to compare death ratio instead of raw counts.
 
 
 ## Exploratory data analysis
@@ -101,13 +103,16 @@ inner_join(data,topRegions,by = "region")%>%arrange(desc(total))
 ggplot(data,aes(x=uvb,y=deaths,color=nation))+
   geom_point()
 
+```
 
-
+```{r summary of the dataset}
+data_complete2%>%group_by(nation)%>%summarise(total_deaths =sum(deaths), deaths_mean=mean(deaths),deaths_sd=sd(deaths),expected_mean=mean(expected),male_population=mean(male_population))
 ```
 
 # Integrate with population of country
 The population data are taken from the following dataset and are related to the 1980 year: 
 https://openei.org/doe-opendata/dataset/a7fea769-691d-4536-8ed3-471e993a2445
+In order to get population data on the county level I choose to use the values of the expected deaths, this enabled me to rescale the values from the nation-level ones. According to my analysis this operation clearly improves the model performance, since otherwise it would be not possible to compare the counts of different regions. The population variable is trathed in the following as an exposure variable.
 
 ```{r population}
 

@@ -220,3 +220,50 @@ loo_diff = compare(loo_1,loo_2,loo_3,loo_4,loo_5,loo_6,loo_7,loo_9,loo_10,loo_11
 ```{r show comparison}
 kable(loo_diff,caption="Comparison between models")
 ```
+
+```{r model 9 Simpler is better}
+#Analysing stronger model with simple explanataion
+print(fit9, pars = c('sigma_mu','beta','alpha','phi','mu'))
+y_rep <- as.matrix(fit9, pars = "y_rep")
+
+ppc_dens_overlay(data_complete2$deaths, y_rep[1:284,])+
+  ggtitle("Rock and Roll")
+
+y=data_complete2$deaths
+ppc_stat(y,y_rep,stat="mean")
+ppc_stat(y,y_rep,stat="sd")
+
+ppc_stat_grouped(y,y_rep,group=data_complete$nation,stat="mean")+
+  ggtitle("Using exposures means comparison")
+
+
+
+#y_rep <- posterior_predict(fit3, draws = 500)
+ppc_stat_grouped(y,y_rep,group=data_complete$nation,stat="sd")+
+  ggtitle("Using exposures sd comparison")
+
+
+
+#std residuals
+mean_inv_phi <- mean(as.matrix(fit9, pars = "inv_phi"))
+mean_y_rep <- colMeans(y_rep)
+std_resid <- (data_complete2$deaths - mean_y_rep) / sqrt(mean_y_rep + mean_y_rep^2*mean_inv_phi)
+plotData=data.frame(std_resid,mean_y_rep)
+ggplot(plotData,aes(x=mean_y_rep,y=std_resid))+
+  geom_point()+
+  geom_hline(yintercept = 2,color="red")+
+  geom_hline(yintercept = -2,color = "red")+
+    geom_hline(yintercept = 3,color="green")+
+  geom_hline(yintercept = -3,color = "green")+
+  ggtitle("Std residuals for fit 9")
+
+posterior <- as.array(fit9)
+dim(posterior)
+mcmc_areas(posterior,regex_pars = "mu")
+mcmc_intervals(posterior,regex_pars = "mu")
+mcmc_hist(posterior,regex_pars = "mu")
+#mcmc_scatter(posterior,pars = c("alpha"))
+mcmc_trace(posterior,pars = c("alpha"))
+#mcmc_parcoord(posterior,pars = c("alpha"))
+#mcmc_pairs(posterior,pars = c("alpha"))
+```

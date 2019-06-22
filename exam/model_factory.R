@@ -314,6 +314,7 @@ loo_diff
 y_rep <- as.matrix(fitted_12, pars = "y_rep")
 y=data_complete2$deaths
 ppc_stat(y,y_rep,stat="sd")
+ppc_dens_overlay(data_complete2$deaths, y_rep[1:200,])
 
 ppc_stat_grouped(y,y_rep,group=data_complete$nation,stat="mean")+
   ggtitle("Using exposures means comparison")
