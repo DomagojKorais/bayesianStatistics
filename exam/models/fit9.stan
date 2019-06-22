@@ -43,9 +43,12 @@ model {
 } 
 generated quantities {
   int y_rep[N];
+  vector[N] log_lik;
   for (n in 1:N) {
     real eta_n = mu[nation_idx[n]] + beta * uvb[n]+ population[n];
     y_rep[n] = neg_binomial_2_log_safe_rng(eta_n, phi);
+    log_lik[n] = neg_binomial_2_log_lpmf(deaths[n]| eta_n, phi);
+    
   }
 }
 
