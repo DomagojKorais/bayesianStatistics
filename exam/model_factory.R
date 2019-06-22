@@ -8,6 +8,7 @@ library(loo)
 
 
 #prepare data
+seed=pi
 data = Mmmec
 populationbycountry19802010millions <- read_csv("populationbycountry19802010millions.csv", 
                                                 col_types = cols(`1980` = col_double()))
@@ -121,17 +122,23 @@ stan_dat_hier_9 =
        )
   )
 #RUN MODEL grouped on nations
-model9 = stan_model("fit9.stan")S
+model9 = rstan::stan_model("fit9.stan")
 
-fitted_9 <- sampling(model9, data = stan_dat_hier_9,
-                     chains = 4, cores = 4, iter = 4000)
+fitted_9 <- rstan::sampling(model9, data = stan_dat_hier_9,
+                     chains = 4, cores = 4, iter = 4000,seed=seed)
 samps_hier_9 <- rstan::extract(fitted_9)
 saveRDS(fitted_9,"models/fit9.stanModel")
 
 print(fitted_9, pars = c('sigma_mu','beta','alpha','phi','mu'))
 plot(fitted_9)
 
+library(loo)
 
+log_lik_slopes <- extract_log_lik(fitted_9)
+loo_slopes <- loo(log_lik_slopes)
+loo_9=loo_slopes
+loo_diff = compare(loo_1,loo_2,loo_3,loo_4,loo_5,loo_6,loo_7,loo_9)
+loo_diff
 
 y_rep <- as.matrix(fitted_9, pars = "y_rep")
 y=data_complete2$deaths
@@ -168,16 +175,21 @@ stan_dat_hier_10 =
             population = log(local_male_population)
        )
   )
-model10 = stan_model("fit10.stan")
+model10 = rstan::stan_model("fit10.stan")
 
-fitted_10 <- sampling(model10, data = stan_dat_hier_10,
-                     chains = 1, cores = 4, iter = 4000, verbose=TRUE)
+fitted_10 <- rstan::sampling(model10, data = stan_dat_hier_10,
+                     chains = 4, cores = 4, iter = 4000, verbose=TRUE,seed=seed)
+
 samps_hier_10 <- rstan::extract(fitted_10)
 saveRDS(fitted_10,"models/fit10.stanModel")
 
 print(fitted_10, pars = c('sigma_mu','beta','alpha','phi','mu'))
 plot(fitted_10)
-
+log_lik_slopes <- extract_log_lik(fitted_10)
+loo_slopes <- loo(log_lik_slopes)
+loo_10=loo_slopes
+loo_diff = compare(loo_1,loo_2,loo_3,loo_4,loo_5,loo_6,loo_7,loo_9,loo_10)
+loo_diff
 
 
 y_rep <- as.matrix(fitted_10, pars = "y_rep")
@@ -217,16 +229,22 @@ stan_dat_hier_11 =
             population = log(local_male_population)
        )
   )
-model11 = stan_model("fit11.stan")
+model11 = rstan::stan_model("fit11.stan")
 
-fitted_11 <- sampling(model11, data = stan_dat_hier_11,
-                      chains = 4, cores = 4, iter = 4000, verbose=TRUE)
+fitted_11 <- rstan::sampling(model11, data = stan_dat_hier_11,
+                      chains = 4, cores = 4, iter = 4000, verbose=TRUE,seed=seed)
 samps_hier_11 <- rstan::extract(fitted_11)
 saveRDS(fitted_11,"models/fit11.stanModel")
 
 print(fitted_11, pars = c('sigma_mu','beta','alpha','phi','mu'))
 plot(fitted_11)
 pairs(fitted_11)
+
+log_lik_slopes <- extract_log_lik(fitted_11)
+loo_slopes <- loo(log_lik_slopes)
+loo_11=loo_slopes
+loo_diff = compare(loo_1,loo_2,loo_3,loo_4,loo_5,loo_6,loo_7,loo_11)
+loo_diff
 
 
 
@@ -274,16 +292,22 @@ stan_dat_hier_12 =
             population = log(local_male_population)
        )
   )
-model12 = stan_model("fit12.stan")
+model12 = rstan::stan_model("fit12.stan")
 
-fitted_12 <- sampling(model12, data = stan_dat_hier_12,
-                      chains = 1, cores = 4, iter = 4000, verbose=TRUE)
+fitted_12 <- rstan::sampling(model12, data = stan_dat_hier_12,
+                      chains = 4, cores = 4, iter = 4000, verbose=TRUE,seed=seed)
 samps_hier_12 <- rstan::extract(fitted_12)
 saveRDS(fitted_12,"models/fit12.stanModel")
 
 print(fitted_12, pars = c('sigma_mu','beta','alpha','phi','mu'))
 plot(fitted_12)
 pairs(fitted_12)
+
+log_lik_slopes <- extract_log_lik(fitted_12)
+loo_slopes <- loo(log_lik_slopes)
+loo_12=loo_slopes
+loo_diff = compare(loo_1,loo_2,loo_3,loo_4,loo_5,loo_6,loo_7,loo_9,loo_10,loo_11,loo_12)
+loo_diff
 
 
 
