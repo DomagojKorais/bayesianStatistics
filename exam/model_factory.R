@@ -332,5 +332,71 @@ std_resid <- (stan_dat_hier$deaths - mean_y_rep) / sqrt(mean_y_rep + mean_y_rep^
 qplot(mean_y_rep, std_resid) + hline_at(2) + hline_at(-2)
 
 
+#RUN MODEL 13 VARYING INTERCEPT AND SLOPE on regions
+#prepare model matrix data
+group_data = data.frame(stan_dat_hier_11)%>%
+  group_by(region_idx)%>%
+  summarise(uvb=mean(uvb))%>%
+  select(region_idx,uvb)
+
+
+stan_dat_hier_13 =
+  with(data3,
+       list(deaths = deaths,
+            uvb = uvb,
+            N = length(deaths),
+            #L = length(unique(nation)),
+            J = length(unique(region)),
+            K = 2,
+            #region_idx = as.integer(unique(region)),
+            region_fac = factor(region, levels = unique(region)),
+            region_idx = as.integer(factor(region, levels = unique(region))),
+            nation_fac = factor(nation, levels = unique(nation)),
+            nation_idx = as.integer(factor(nation, levels = unique(nation))),
+            group_data = group_data,
+            population = log(local_male_population)
+       )
+  )
+model13 = rstan::stan_model("fit13.stan")
+seed=pi
+fitted_13 <- rstan::sampling(model13, data = stan_dat_hier_13,
+                             chains = 4, cores = 4, iter = 4000, verbose=TRUE,seed=seed)
+samps_hier_13 <- rstan::extract(fitted_13)
+saveRDS(fitted_13,"models/fit13.stanModel")
+
+print(fitted_13, pars = c('sigma_mu','beta','alpha','phi','mu'))
+plot(fitted_13)
+pairs(fitted_13)
+
+log_lik_slopes <- extract_log_lik(fitted_13)
+loo_slopes <- loo(log_lik_slopes)
+loo_13=loo_slopes
+loo_diff = compare(loo_1,loo_2,loo_3,loo_4,loo_5,loo_6,loo_7,loo_9,loo_10,loo_11,loo_12,loo_13)
+loo_diff
+loo_13
+
+
+
+y_rep <- as.matrix(fitted_13, pars = "y_rep")
+y=data_complete2$deaths
+ppc_stat(y,y_rep,stat="sd")
+ppc_dens_overlay(data_complete2$deaths, y_rep[1:200,])
+
+ppc_stat_grouped(y,y_rep,group=data_complete$nation,stat="mean")+
+  ggtitle("Using exposures means comparison")
+
+
+
+#y_rep <- posterior_predict(fit3, draws = 500)
+ppc_stat_grouped(y,y_rep,group=data_complete$nation,stat="sd")+
+  ggtitle("Using exposures sd comparison")
+
+mean_y_rep <- colMeans(y_rep)
+
+mean_inv_phi <- mean(as.matrix(fitted_13, pars = "inv_phi"))
+std_resid <- (stan_dat_hier$deaths - mean_y_rep) / sqrt(mean_y_rep + mean_y_rep^2*mean_inv_phi)
+qplot(mean_y_rep, std_resid) + hline_at(2) + hline_at(-2)
+
+
 
 

@@ -201,6 +201,7 @@ fit9=readRDS("models/fit9.stanModel")
 fit10=readRDS("models/fit10.stanModel")
 fit11=readRDS("models/fit11.stanModel")
 fit12=readRDS("models/fit12.stanModel")
+fit13=readRDS("models/fit13.stanModel")
 #compare models
 loo_1  = loo(fit1)
 loo_2  = loo(fit2)
@@ -213,7 +214,8 @@ loo_9  = custom_loo(fit9)
 loo_10  = custom_loo(fit10)
 loo_11  = custom_loo(fit11)
 loo_12  = custom_loo(fit12)
-loo_diff = compare(loo_1,loo_2,loo_3,loo_4,loo_5,loo_6,loo_7,loo_9,loo_10,loo_11,loo_12)
+loo_13  = custom_loo(fit13)
+loo_diff = compare(loo_1,loo_2,loo_3,loo_4,loo_5,loo_6,loo_7,loo_9,loo_10,loo_11,loo_12,loo_13)
 
 ```
 
@@ -223,8 +225,9 @@ kable(loo_diff,caption="Comparison between models")
 
 ```{r model 9 Simpler is better}
 #Analysing stronger model with simple explanataion
-print(fit9, pars = c('sigma_mu','beta','alpha','phi','mu'))
-y_rep <- as.matrix(fit9, pars = "y_rep")
+fit=fit13
+print(fit, pars = c('sigma_mu','beta','alpha','phi','mu'))
+y_rep <- as.matrix(fit, pars = "y_rep")
 
 ppc_dens_overlay(data_complete2$deaths, y_rep[1:284,])+
   ggtitle("Rock and Roll")
@@ -245,7 +248,7 @@ ppc_stat_grouped(y,y_rep,group=data_complete$nation,stat="sd")+
 
 
 #std residuals
-mean_inv_phi <- mean(as.matrix(fit9, pars = "inv_phi"))
+mean_inv_phi <- mean(as.matrix(fit, pars = "inv_phi"))
 mean_y_rep <- colMeans(y_rep)
 std_resid <- (data_complete2$deaths - mean_y_rep) / sqrt(mean_y_rep + mean_y_rep^2*mean_inv_phi)
 plotData=data.frame(std_resid,mean_y_rep)
@@ -255,9 +258,9 @@ ggplot(plotData,aes(x=mean_y_rep,y=std_resid))+
   geom_hline(yintercept = -2,color = "red")+
     geom_hline(yintercept = 3,color="green")+
   geom_hline(yintercept = -3,color = "green")+
-  ggtitle("Std residuals for fit 9")
+  ggtitle("Std residuals for fit ")
 
-posterior <- as.array(fit9)
+posterior <- as.array(fit)
 dim(posterior)
 mcmc_areas(posterior,regex_pars = "mu")
 mcmc_intervals(posterior,regex_pars = "mu")
