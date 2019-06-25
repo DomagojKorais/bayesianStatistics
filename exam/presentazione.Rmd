@@ -241,8 +241,9 @@ library(loo)
 library(bayesplot)
 #Analysing stronger model with simple explanataion
 
-fit=fit17
-fit2=fit16
+
+fit=fit16
+fit2=fit17
 print(fit, pars = c('mu','kappa'))
 y_rep <- as.matrix(fit, pars = "y_rep")
 y_rep2 <- as.matrix(fit2, pars = "y_rep")
@@ -250,7 +251,9 @@ kappa = as.matrix(fit,pars = 'kappa')
 kappa_mean = colMeans(kappa)
 mu = as.matrix(fit,pars = 'mu')
 mu_mean = colMeans(mu)
- 
+ a=data.frame(unique(data_complete2$nation),t(mu))
+
+a=t(a)
 
 y_rep_values = y_rep[1:length(data_complete2$deaths),]
 y_rep_values2 = y_rep[1:length(data_complete2$deaths),]
@@ -302,11 +305,12 @@ ggplot(plotData2,aes(x=mean_y_rep,y=std_resid2,color=nation))+
 
 posterior <- as.array(fit)
 dim(posterior)
-mcmc_areas(posterior,pars = c("mu[1]","mu[2]","mu[3]","mu[4]"))
+mcmc_areas(posterior,pars = c("mu[1]","mu[2]","mu[3]","mu[4]","mu[5]","mu[6]","mu[7]","mu[8]"))
+mcmc_areas(posterior,pars = c("kappa[1]","kappa[2]","kappa[3]","kappa[4]","kappa[5]","kappa[6]","kappa[7]","kappa[8]"))
 mcmc_intervals(posterior,regex_pars = "mu")
 mcmc_hist(posterior,regex_pars = "mu")
 #mcmc_scatter(posterior,pars = c("alpha"))
-mcmc_trace(posterior,pars = c("kappa[3]"))
+mcmc_trace(posterior,pars = c("kappa[1]"))
 color_scheme_set("darkgray")
 np_cp <- nuts_params(fit)
 head(np_cp)
@@ -317,4 +321,12 @@ mcmc_pairs(posterior, np = np_cp, regex_pars = c("mu"),
 #mcmc_pairs(posterior,pars = c("alpha"))
 #from regions back to nations
 nationLookupVec <- unique(data_complete2[c("region","nation")])[,"nation"]
+regionData = data.frame(nationLookupVec,mu_mean,kappa_mean)
+
+ggplot(regionData,aes(x=nation,y=mu_mean))+
+  geom_boxplot()
+
+
+ggplot(regionData,aes(x=nation,y=kappa_mean))+
+  geom_boxplot()
 ```
