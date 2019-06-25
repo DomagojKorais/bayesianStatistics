@@ -9,7 +9,7 @@ output:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE)
-knitr::opts_chunk$set(cache = TRUE)
+knitr::opts_chunk$set(cache = FALSE)
 knitr::opts_chunk$set(message=FALSE)
 knitr::opts_chunk$set(warning = FALSE)
 library(tidyverse)
@@ -82,7 +82,7 @@ p4 = ggplot(data,aes(x=uvb))+
 
 grid.arrange(p3, p4, ncol=2)
 
-#residuals at county level
+#residuals at county level WITHOUT STANDARDIZING, ONLY RESCALING
 data%>%
   mutate(delta=(deaths-expected)/deaths)%>%
   ggplot(aes(x=deaths,y=delta,color = nation))+
@@ -139,9 +139,9 @@ In order to get population data on the county level I choose to use the values o
 populationbycountry19802010millions <- read_csv("populationbycountry19802010millions.csv", 
     col_types = cols(`1980` = col_double()))
 
-#rename Western Germany to make in compatible with our data
+#rename Western Germany and UK to make in compatible with our data
 populationbycountry19802010millions = populationbycountry19802010millions%>%mutate(X1 =replace(X1,X1=="Germany, West","W.Germany"))
-
+populationbycountry19802010millions = populationbycountry19802010millions%>%mutate(X1 =replace(X1,X1=="United Kingdom","UK"))
 pop = populationbycountry19802010millions%>%select(nation=X1,population = '1980')
 
 data_complete = inner_join(pop,data,by=c("nation"="nation"))
@@ -180,7 +180,7 @@ ggpairs( dataReduced )
 
 #Models comparison
 
-```{r compute comparison}
+```{r compute comparison, cache=TRUE}
 library(loo)
 library(bayesplot)
 #function for loo from stan model
@@ -200,8 +200,13 @@ fit7=readRDS("models/fit7.stanModel")
 fit9=readRDS("models/fit9.stanModel")
 fit10=readRDS("models/fit10.stanModel")
 fit11=readRDS("models/fit11.stanModel")
+
 fit12=readRDS("models/fit12.stanModel")
-fit13=readRDS("models/fit13.stanModel")
+#fit13=readRDS("models/fit13.stanModel")
+fit14=readRDS("models/fit14.stanModel")
+fit15=readRDS("models/fit15.stanModel")
+fit16=readRDS("models/fit16.stanModel")
+fit17=readRDS("models/fit17.stanModel")
 #compare models
 loo_1  = loo(fit1)
 loo_2  = loo(fit2)
@@ -214,8 +219,13 @@ loo_9  = custom_loo(fit9)
 loo_10  = custom_loo(fit10)
 loo_11  = custom_loo(fit11)
 loo_12  = custom_loo(fit12)
-loo_13  = custom_loo(fit13)
-loo_diff = compare(loo_1,loo_2,loo_3,loo_4,loo_5,loo_6,loo_7,loo_9,loo_10,loo_11,loo_12,loo_13)
+#loo_13  = custom_loo(fit13)
+loo_14  = custom_loo(fit14)
+loo_15  = custom_loo(fit15)
+loo_16  = custom_loo(fit16)
+loo_17  = custom_loo(fit17)
+#loo_diff = compare(loo_1,loo_2,loo_3,loo_4,loo_5,loo_6,loo_7,loo_9,loo_10,loo_11,loo_12,loo_13)
+loo_diff = compare(loo_1,loo_2,loo_3,loo_4,loo_5,loo_6,loo_7,loo_9,loo_10,loo_11,loo_12,loo_14,loo_15)
 
 ```
 
@@ -224,25 +234,48 @@ kable(loo_diff,caption="Comparison between models")
 ```
 
 ```{r model 9 Simpler is better}
-#Analysing stronger model with simple explanataion
-fit=fit13
-print(fit, pars = c('sigma_mu','beta','alpha','phi','mu'))
-y_rep <- as.matrix(fit, pars = "y_rep")
 
-ppc_dens_overlay(data_complete2$deaths, y_rep[1:284,])+
+
+#
+library(loo)
+library(bayesplot)
+#Analysing stronger model with simple explanataion
+
+fit=fit17
+fit2=fit16
+print(fit, pars = c('mu','kappa'))
+y_rep <- as.matrix(fit, pars = "y_rep")
+y_rep2 <- as.matrix(fit2, pars = "y_rep")
+kappa = as.matrix(fit,pars = 'kappa')
+kappa_mean = colMeans(kappa)
+mu = as.matrix(fit,pars = 'mu')
+mu_mean = colMeans(mu)
+ 
+
+y_rep_values = y_rep[1:length(data_complete2$deaths),]
+y_rep_values2 = y_rep[1:length(data_complete2$deaths),]
+print(ncol(y_rep_values))
+print(length(data_complete2$deaths))
+ppc_dens_overlay(data_complete2$deaths,y_rep_values)+
+  ggtitle("Rock and Roll")
+ppc_dens_overlay(data_complete2$deaths,y_rep_values2)+
   ggtitle("Rock and Roll")
 
 y=data_complete2$deaths
-ppc_stat(y,y_rep,stat="mean")
-ppc_stat(y,y_rep,stat="sd")
+ppc_stat(y,y_rep_values,stat="mean")
+ppc_stat(y,y_rep_values,stat="sd")
 
-ppc_stat_grouped(y,y_rep,group=data_complete$nation,stat="mean")+
+ppc_stat_grouped(y,y_rep_values,group=data_complete2$nation,stat="mean")+
+  ggtitle("Using exposures means comparison")
+ppc_stat_grouped(y,y_rep_values2,group=data_complete2$nation,stat="mean")+
   ggtitle("Using exposures means comparison")
 
 
 
 #y_rep <- posterior_predict(fit3, draws = 500)
-ppc_stat_grouped(y,y_rep,group=data_complete$nation,stat="sd")+
+ppc_stat_grouped(y,y_rep_values,group=data_complete2$nation,stat="sd")+
+  ggtitle("Using exposures sd comparison")
+ppc_stat_grouped(y,y_rep_values2,group=data_complete2$nation,stat="sd")+
   ggtitle("Using exposures sd comparison")
 
 
@@ -260,13 +293,28 @@ ggplot(plotData,aes(x=mean_y_rep,y=std_resid))+
   geom_hline(yintercept = -3,color = "green")+
   ggtitle("Std residuals for fit ")
 
+std_resid2 <- (data_complete2$deaths - mean_y_rep) / (mean_y_rep)
+plotData2=data.frame(std_resid2,mean_y_rep,nation=data_complete2$nation)
+ggplot(plotData2,aes(x=mean_y_rep,y=std_resid2,color=nation))+
+  geom_point()+
+  ggtitle("Scaled residuals for fit ")
+
+
 posterior <- as.array(fit)
 dim(posterior)
-mcmc_areas(posterior,regex_pars = "mu")
+mcmc_areas(posterior,pars = c("mu[1]","mu[2]","mu[3]","mu[4]"))
 mcmc_intervals(posterior,regex_pars = "mu")
 mcmc_hist(posterior,regex_pars = "mu")
 #mcmc_scatter(posterior,pars = c("alpha"))
-mcmc_trace(posterior,pars = c("alpha"))
+mcmc_trace(posterior,pars = c("kappa[3]"))
+color_scheme_set("darkgray")
+np_cp <- nuts_params(fit)
+head(np_cp)
+mcmc_parcoord(posterior, np = np_cp,pars = c("mu[1]","mu[2]","mu[3]","mu[4]"))
+mcmc_pairs(posterior, np = np_cp, regex_pars = c("mu"),
+           off_diag_args = list(size = 0.75))
 #mcmc_parcoord(posterior,pars = c("alpha"))
 #mcmc_pairs(posterior,pars = c("alpha"))
+#from regions back to nations
+nationLookupVec <- unique(data_complete2[c("region","nation")])[,"nation"]
 ```
