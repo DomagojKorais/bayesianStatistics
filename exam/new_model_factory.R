@@ -115,6 +115,6 @@ dotplot(ranef(a, condVar = T), strip = T, scales=list(relation='free'))$"groupin
 dotplot(ranef(a, condVar = T), strip = T, scales=list(relation='free'))$"groupingL2"
 
 
-#stan style with best model
+#stan style with best models
 fit2 <- stan_glmer(formula = deaths ~ (1|groupingL3) +(0+uvb|groupingL3) + offset(local_male_population), data=data_complete3, family=neg_binomial_2(),cores=4)
 summary(fit2)
