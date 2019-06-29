@@ -42,7 +42,7 @@ group_data = data.frame(data3)%>%
 stan_dat_hier =
   with(data3,
        list(deaths = deaths,
-            uvb = uvb,
+            uvb = uvb/10,#rendiamolo compreso tra -1 e 1
             N = length(deaths),
             J = N_nations,
             K = 1,
@@ -63,3 +63,58 @@ head(np_cp)
 posterior <- as.array(fitted)
 mcmc_parcoord(posterior, np = np_cp,regex_pars = c("mu"))
 
+#non Bayesian multilvel modelling using lmer
+#REFERENCE FOR MIXED MODELS:https://cran.r-project.org/web/packages/lme4/vignettes/lmer.pdf
+#Some formulas:
+# 1 + (1|g) intercette variano col gruppo g
+# 0 + offset(o) + (1|g) intercette con media a priori
+#rescale
+groupingL3=data_complete3$nation
+groupingL2=data_complete3$region
+
+data_complete3=data_complete2%>%mutate(uvb=(uvb+10)/10)%>%filter(uvb>0)
+a=glmer(data=data_complete3, formula = deaths ~ (1+uvb|groupingL2)+ offset(local_male_population),family=MASS::negative.binomial(theta=2))
+a=glmer(data=data_complete3, formula = deaths ~ (1+uvb|groupingL3)+ offset(local_male_population),family=MASS::negative.binomial(theta=2))
+#double nested
+aics=matrix(nrow=10,ncol=7)
+aics[1,]=aic[]
+for(i in 1:10){
+print(i)
+
+  aic=array()
+  a=glmer(data=data_complete3, formula = deaths ~ (1|groupingL3:groupingL2) +(0+uvb|groupingL3:groupingL2) + offset(local_male_population),family=MASS::negative.binomial(theta=3*i))
+  aic=append(aic,AIC(logLik(a)))
+  a=glmer(data=data_complete3, formula = deaths ~ (1|groupingL3) +(0+uvb|groupingL3) + offset(local_male_population),family=MASS::negative.binomial(theta=3*i))
+  aic=append(aic,AIC(logLik(a)))
+  a=glmer(data=data_complete3, formula = deaths ~ (1|groupingL3:groupingL2) +(0+uvb|groupingL3) + offset(local_male_population),family=MASS::negative.binomial(theta=3*i))
+  aic=append(aic,AIC(logLik(a)))
+  a=glmer(data=data_complete3, formula = deaths ~ (1|groupingL3) +(0+uvb|groupingL3:groupingL2) + offset(local_male_population),family=MASS::negative.binomial(theta=3*i))
+  aic=append(aic,AIC(logLik(a)))
+  #a=glmer(data=data_complete3, formula = deaths ~ 1 +uvb + offset(local_male_population),family=MASS::negative.binomial(theta=3*i))
+  #aic=append(aic,AIC(logLik(a)))
+  a=glmer(data=data_complete3, formula = deaths ~ (1|groupingL3) +uvb+ offset(local_male_population),family=MASS::negative.binomial(theta=3*i))
+  aic=append(aic,AIC(logLik(a)))
+  a=glmer(data=data_complete3, formula = deaths ~ 1 +(0+uvb|groupingL3)+ offset(local_male_population),family=MASS::negative.binomial(theta=3*i))
+  aic=append(aic,AIC(logLik(a)))
+  aics[i,]=aic[]
+}
+print (aics)
+values=fitted(a)
+summary(a)
+#visualize
+data_complete3 %>% 
+  # save predicted values
+  mutate(pred_deaths = fitted(a)) %>% 
+  mutate(residuals = (deaths-fitted(a))/deaths) %>% 
+  # graph
+  ggplot(aes( x=deaths,y=residuals, color=nation)) + theme_classic() +
+  geom_point(size=1) 
+library(caret)
+dotplot(ranef(a, condVar = T), strip = T, scales=list(relation='free'))$"groupingL3:groupingL2"
+dotplot(ranef(a, condVar = T), strip = T, scales=list(relation='free'))$"groupingL3"
+dotplot(ranef(a, condVar = T), strip = T, scales=list(relation='free'))$"groupingL2"
+
+
+#stan style with best model
+fit2 <- stan_glmer(formula = deaths ~ (1|groupingL3) +(0+uvb|groupingL3) + offset(local_male_population), data=data_complete3, family=neg_binomial_2(),cores=4)
+summary(fit2)
