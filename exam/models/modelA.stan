@@ -19,9 +19,9 @@ data {
   vector<lower=-10>[N] uvb;//uvb value
   vector[N] population;  //exposure
   
-  int<lower=0> region_id[N]; //region
+  //int<lower=0> region_id[N]; //region
   int<lower=0> nation_id[N]; //nation
-  int<lower=1,upper=J> nationWithinRegion[L]; 
+  //int<lower=1,upper=J> nationWithinRegion[L]; 
 
 }
 
@@ -29,30 +29,30 @@ parameters {//default is weakly informative
   real<lower=0> inv_phi;   
   real beta;
   real alpha; //the intercept
-  vector[J] alpha_nat; //nations level
+
   
   //the deviation from the intercept at the different levels
-  real dev_reg[L]; //deviation between the regions within a nation
+  //real dev_reg[L]; //deviation between the regions within a nation
   real dev_nat[J]; //deviation between the nations
 
   //the standard deviation for the deviations
-  real<lower=0> sigma_reg;
-  real<lower=0> sigma_nat;
+  //real<lower=0> sigma_reg;
+  //real<lower=0> sigma_nat;
 }
 
 transformed parameters {
     //varying intercepts
-
-  real alpha_reg[L];//regions level
+  vector[J] alpha_nat; //nations level
+  //real alpha_reg[L];//regions level
   
   real phi = inv(inv_phi);
   //real<lower=0> lambda[N];
   
   //compute the varying intercept at the nation level
-    /*
   for(j in 1:J){
     alpha_nat[j] = alpha + dev_nat[j];
   }
+  /*
   //compute varying intercept at the population within region level
 
   for(l in 1:L){
@@ -66,14 +66,14 @@ transformed parameters {
 
 model {
   inv_phi ~ normal(0,1);
-  alpha_nat ~ normal(4.5,1);
+  alpha ~ normal(4.5,1);
   beta ~ normal(0,1);
   //weakly informative prior on the standard deviation
-  sigma_reg ~ cauchy(0,2.5);
-  sigma_nat ~ cauchy(0,2.5);
+  //sigma_reg ~ cauchy(0,2.5);
+  //sigma_nat ~ cauchy(0,2.5);
   //distribution of the varying intercept
-  dev_reg ~ normal(0,2);
-  dev_nat ~ normal(0,2);
+  //dev_reg ~ normal(0,2);
+  dev_nat ~ normal(0,1);
 
   //response
   deaths ~ neg_binomial_2_log( alpha_nat[nation_id] + beta * uvb + population, phi);

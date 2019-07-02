@@ -12,6 +12,7 @@ library(rstan)
 seed=pi
 data = Mmmec
 data
+deaths=data$deaths
 groupingL3=data$nation
 groupingL2=data$region
 groupingL1=data$county
@@ -66,13 +67,25 @@ stan_data =
 
 #run model
 fitted_a_stan <- rstan::sampling(model_a_stan, data = stan_data,
-                          chains = 4, cores = 4, iter = 4000, verbose=TRUE,seed=seed)
+                          chains = 2, cores = 2, iter = 1000, verbose=TRUE,seed=seed)
 launch_shinystan(fitted_a_stan)
 saveRDS(fitted,"models/fitted_a_model.stanModel")
 
 mod=rstan::get_stanmodel(mod_a_neg_bin_bayes)
 
-a=mod_a_neg_bin_bayes
+a=fitted_a_stan
+#basic plots
+y_rep = as.matrix(fit, pars = "y_rep")
+y_rep_values = y_rep[1:length(data$deaths),]
+ppc_dens_overlay(data$deaths,y_rep_values)+
+  ggtitle("Rock and Roll")
+y=data$deaths
+ppc_stat(y,y_rep_values,stat="mean")
+ppc_stat(y,y_rep_values,stat="sd")
+ppc_stat_grouped(y,y_rep_values,group=data$nation,stat="mean")+
+  ggtitle("Using exposures means comparison")
+ppc_stat_grouped(y,y_rep_values,group=data$nation,stat="sd")+
+  ggtitle("Using exposures sd comparison")
 summary(a)
 resid(a,type="deviance")
 ranef(a)
