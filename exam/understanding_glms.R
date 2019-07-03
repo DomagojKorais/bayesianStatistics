@@ -71,14 +71,19 @@ model_a_poisson_stan = rstan::stan_model("models/modelA_poisson.stan")
 #run model
 fitted_a_stan <- rstan::sampling(model_a_stan, data = stan_data,
                           chains = 4, cores = 4, iter = 4000, control = list(adapt_delta = 0.99, max_treedepth=50),verbose=TRUE,seed=seed)
+fitted_b_stan <- rstan::sampling(model_b_stan, data = stan_data,
+                          chains = 4, cores = 4, iter = 4000, control = list(adapt_delta = 0.999, max_treedepth=40),verbose=TRUE,seed=4)
+
 fitted_a_poisson_stan <- rstan::sampling(model_a_poisson_stan, data = stan_data,
-                                 chains = 1, cores = 4, iter = 1000, control = list(adapt_delta = 0.99, max_treedepth=10),verbose=TRUE,seed=seed)
-
-launch_shinystan(fitted_a_stan)
-saveRDS(fitted,"models/modelA.stanModel")
+                          chains = 4, cores = 4, iter = 1000, control = list(adapt_delta = 0.99, max_treedepth=10),verbose=TRUE,seed=seed)
 
 
-fit=fitted_a_stan
+launch_shinystan(fitted_b_stan)
+#saveRDS(fitted_b_stan,"models/modelB.stanModel")
+
+
+
+fit=fitted_b_stan
 summary(fit)
 posterior_dev=rstan::get_posterior_mean(fitted_a_stan)
 #basic plots
