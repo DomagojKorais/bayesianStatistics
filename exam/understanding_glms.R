@@ -42,8 +42,7 @@ mod_a_neg_bin_bayes=stan_glmer(data=data, formula = deaths ~ 1+(1|groupingL3:gro
 #model B using negative Binomial
 mod_b_neg_bin_bayes=stan_glmer(data=data, formula = deaths ~ 1+(1 + uvb|groupingL3:groupingL2) + (1 + uvb|groupingL3)+uvb + offset(log(expected)),family=neg_binomial_2(link = "log"),cores=4)
 #model A using Stan indpired from https://biologyforfun.wordpress.com/2016/12/08/crossed-and-nested-hierarchical-models-with-stan-and-r/
-#import model
-model_a_stan = rstan::stan_model("models/modelA.stan")
+
 #preparing data transforming factors in integers
 data2=data
 data2$region_id = as.integer(factor(data$region, levels = unique(data$region)))
@@ -64,16 +63,24 @@ stan_data =
             nationWithinRegion = nationLookupVec 
             )
        )
+#import  and compile model
 
+model_a_stan = rstan::stan_model("models/modelA.stan")
+model_b_stan = rstan::stan_model("models/modelB.stan")
+model_a_poisson_stan = rstan::stan_model("models/modelA_poisson.stan")
 #run model
 fitted_a_stan <- rstan::sampling(model_a_stan, data = stan_data,
-                          chains = 2, cores = 2, iter = 1000, verbose=TRUE,seed=seed)
+                          chains = 4, cores = 4, iter = 4000, control = list(adapt_delta = 0.99, max_treedepth=50),verbose=TRUE,seed=seed)
+fitted_a_poisson_stan <- rstan::sampling(model_a_poisson_stan, data = stan_data,
+                                 chains = 1, cores = 4, iter = 1000, control = list(adapt_delta = 0.99, max_treedepth=10),verbose=TRUE,seed=seed)
+
 launch_shinystan(fitted_a_stan)
-saveRDS(fitted,"models/fitted_a_model.stanModel")
+saveRDS(fitted,"models/modelA.stanModel")
 
-mod=rstan::get_stanmodel(mod_a_neg_bin_bayes)
 
-a=fitted_a_stan
+fit=fitted_a_stan
+summary(fit)
+posterior_dev=rstan::get_posterior_mean(fitted_a_stan)
 #basic plots
 y_rep = as.matrix(fit, pars = "y_rep")
 y_rep_values = y_rep[1:length(data$deaths),]
@@ -86,8 +93,28 @@ ppc_stat_grouped(y,y_rep_values,group=data$nation,stat="mean")+
   ggtitle("Using exposures means comparison")
 ppc_stat_grouped(y,y_rep_values,group=data$nation,stat="sd")+
   ggtitle("Using exposures sd comparison")
+#variance:
+std_final=mean(sqrt(mean_y_rep + mean_y_rep^2*mean_inv_phi))
+
+#std residuals
+mean_inv_phi <- mean(as.matrix(fit, pars = "inv_phi"))
+mean_y_rep <- colMeans(y_rep)
+std_resid <- (data$deaths - mean_y_rep) / sqrt(mean_y_rep + mean_y_rep^2*mean_inv_phi)
+plotData=data.frame(std_resid,mean_y_rep)
+ggplot(plotData,aes(x=mean_y_rep,y=std_resid))+
+  geom_point()+
+  geom_hline(yintercept = 2,color="red")+
+  geom_hline(yintercept = -2,color = "red")+
+  geom_hline(yintercept = 3,color="green")+
+  geom_hline(yintercept = -3,color = "green")+
+  ggtitle("Std residuals for fit ")
+
+
+
+
+
 summary(a)
-resid(a,type="deviance")
+resid(fit,type="deviance")
 ranef(a)
 fixef(a)
 se(a)
