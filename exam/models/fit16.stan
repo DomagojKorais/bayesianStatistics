@@ -38,6 +38,7 @@ transformed parameters {
   vector[J] kappa = beta + sigma_kappa * kappa_raw;
 }
 model {
+
 deaths ~ neg_binomial_2_log(mu[group_idx] + kappa[group_idx] .* uvb + population , phi);
 } 
 generated quantities {

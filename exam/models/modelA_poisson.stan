@@ -33,6 +33,7 @@ transformed parameters {
 //varying intercepts
   vector[J] alpha_nat; //nations level
   vector[L] alpha_reg;//regions level
+  
 
 
 //real<lower=0> lambda[N];

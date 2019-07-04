@@ -66,28 +66,73 @@ stan_data =
 #import  and compile model
 
 model_a_stan = rstan::stan_model("models/modelA.stan")
+readRDS("models/modelB.stanModel")
 model_b_stan = rstan::stan_model("models/modelB.stan")
+
 model_a_poisson_stan = rstan::stan_model("models/modelA_poisson.stan")
 #run model
-fitted_a_stan <- rstan::sampling(model_a_stan, data = stan_data,
-                          chains = 4, cores = 4, iter = 4000, control = list(adapt_delta = 0.99, max_treedepth=50),verbose=TRUE,seed=seed)
-fitted_b_stan <- rstan::sampling(model_b_stan, data = stan_data,
-                          chains = 4, cores = 4, iter = 4000, control = list(adapt_delta = 0.999, max_treedepth=40),verbose=TRUE,seed=4)
+#fitted_a_stan <- rstan::sampling(model_a_stan, data = stan_data,
+#                          chains = 4, cores = 4, iter = 4000, control = list(adapt_delta = 0.99, max_treedepth=50),verbose=TRUE,seed=seed)
+fitted_a_stan = readRDS("models/modelA.stanModel")
 
-fitted_a_poisson_stan <- rstan::sampling(model_a_poisson_stan, data = stan_data,
-                          chains = 4, cores = 4, iter = 1000, control = list(adapt_delta = 0.99, max_treedepth=10),verbose=TRUE,seed=seed)
+fitted_b_stan <- rstan::sampling(model_b_stan, data = stan_data,
+                          chains = 4, cores = 4, iter = 4000, control = list(adapt_delta = 0.90, max_treedepth=40),verbose=TRUE,seed=4)
+#fitted_b_stan = readRDS("models/modelB.stanModel")
+
+#fitted_a_poisson_stan <- rstan::sampling(model_a_poisson_stan, data = stan_data,
+#                          chains = 4, cores = 4, iter = 1000, control = list(adapt_delta = 0.99, max_treedepth=10),verbose=TRUE,seed=seed)
 
 
 launch_shinystan(fitted_b_stan)
 #saveRDS(fitted_b_stan,"models/modelB.stanModel")
-
+a=as.data.frame(fit,pars=c())
 
 
 fit=fitted_b_stan
+#retrive parameters of interest (sd)
+list_of_draws=extract(fit)
+sigma_nat=mean(list_of_draws$sigma_nat)
+sigma_nat_sd=sd(list_of_draws$sigma_nat)
+sigma_reg=mean(list_of_draws$sigma_reg)
+sigma_reg_sd=sd(list_of_draws$sigma_reg)
+sigma_beta_reg=mean(list_of_draws$sigma_beta_reg)
+sigma_beta_reg_sd=sd(list_of_draws$sigma_beta_reg)
+sigma_beta_nat=mean(list_of_draws$sigma_beta_nat)
+sigma_beta_nat_sd=sd(list_of_draws$sigma_beta_nat)
+#fitted parameters
+alpha=mean(list_of_draws$alpha)
+beta=mean(list_of_draws$beta)
+#variations on nation level
+beta_nat=colMeans(list_of_draws$beta_nat)
+beta_nat_sd = apply(list_of_draws$beta_nat, 2, sd)
+alpha_nat=colMeans(list_of_draws$alpha_nat)
+alpha_nat_sd = apply(list_of_draws$alpha_nat, 2, sd)
+#rate
+eta = colMeans(list_of_draws$eta_rep)
+#putting all together
+coeff = data.frame(nation=unique(data$nation),beta=beta_nat,beta_nat_sd,alpha = alpha_nat,alpha_nat_sd)
+#plot figure 2
+#plot slopes
+ggplot(data=data,aes(x=uvb,y=log(eta),color=nation))+
+  geom_point()+
+  geom_abline(data=coeff,aes(slope= beta,intercept=alpha,colour=nation))+
+  ylim(-1,1)+
+  xlim(-9,15)+
+  ggtitle("Random slopes and intercepts like in figure 1")
+
+#plots
+mcmc_intervals(fit,regex_pars = "sigma")
+mcmc_intervals(fit,regex_pars = "^beta_nat")
+mcmc_intervals(fit,regex_pars = "^alpha_nat")
+
+cor(as.matrix(list_of_draws$beta_nat),as.matrix(list_of_draws$alpha_nat))
+
+aa=as.matrix(fit,pars="sigma")
 summary(fit)
-posterior_dev=rstan::get_posterior_mean(fitted_a_stan)
+posterior_dev=rstan::get_posterior_mean(fit)
 #basic plots
 y_rep = as.matrix(fit, pars = "y_rep")
+rate = as.matrix(fit, pars = "eta_n")
 y_rep_values = y_rep[1:length(data$deaths),]
 ppc_dens_overlay(data$deaths,y_rep_values)+
   ggtitle("Rock and Roll")
@@ -151,7 +196,7 @@ ggplot(data=data,aes(x=uvb,y=log(predictedLambda),color=nation))+
   geom_abline(data=coef,aes(slope= beta,intercept=alpha,colour=nation))+
   ylim(-1,1)+
   xlim(-9,15)+
-  ggtitle("Random slopes and intercepts like in figure 2")
+  ggtitle("Random slopes and intercepts like in figure 1")
 
 ggplot(data,aes(x=deaths,y=predicted))+
   geom_point()+
