@@ -1,0 +1,104 @@
+---
+title: "progetto"
+author: "Domagoj Korais"
+date: "June 17, 2019"
+output: 
+  html_document:
+    toc: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+knitr::opts_chunk$set(cache = TRUE)
+knitr::opts_chunk$set(message=FALSE)
+knitr::opts_chunk$set(warning = FALSE)
+library(tidyverse)
+library(gridExtra)
+library(mlmRev)
+library(GGally)
+library(rstanarm)
+library(bayesplot) 
+library(loo)
+library(caret)
+library(rstan)
+library(knitr)
+
+data = Mmmec
+set.seed(pi)
+```
+# Project aim and description
+In this project I studied the relationship between UVB radiation and melanoma mortality rate. Additionaly a comparison with the following paper has been performed:
+<blockquote>
+<p>Langford, I.H., Bentham, G. and McDonald, A. (1998). Multilevel modelling of geographically aggregated health data: a case study on malignant melanoma mortality and UV exposure in the European community. <em>Statistics in Medicine</em>, <em>17</em>, 41-58.</p>
+</blockquote>
+
+# Dataset description
+
+This dataset describes the mortality rate of malignent melanoma in eight European countries.
+The reference is the following: 
+
+<blockquote>
+https://www.rdocumentation.org/packages/R2MLwiN/versions/0.8-6/topics/mmmec
+</blockquote>
+
+There is a total of six variables and 354 observations:
+<ul>
+<li><code>nation</code> a factor with levels <code>Belgium</code>, <code>W.Germany</code>, <code>Denmark</code>, <code>France</code>, <code>UK</code>, <code>Italy</code>, <code>Ireland</code>, <code>Luxembourg</code>, and <code>Netherlands</code></li>
+<li><code>region</code> Region ID - a factor</li>
+<li><code>county</code> County ID - a factor</li>
+<li><code>deaths</code> Number of male deaths due to malignant melanoma during 1971-1980*</li>
+<li><code>expected</code> Number of expected deaths (proportional to population)</li>
+<li><code>uvb</code> Centered measure of the UVB dose reaching the earth’s surface in each county.**</li>
+</ul>
+
+```* for the United Kingdom,
+Ireland, Germany, Italy and The Netherlands, data were only available from 1975—1976 onwards ```
+
+```** in the paper the measure is not centered```
+
+The data are geographically nested, since nations are divided in regions, and regions are divided in counties. 
+A county is the smallest area forwich we have data.
+
+Here is a schema of the nesting:
+![Nesting schema](./nesting.png)
+And relative counts:
+```{r counting elements}
+kable(data%>%group_by(nation)%>%summarise(regions=n_distinct(region),counties=n_distinct(county)),caption = "Data hierarchy")
+```
+
+# EDA
+
+```{r descriptive statistics for centered UVB variable }
+kable(data%>%group_by(nation)%>%summarise(N=n(),mean=mean(uvb),sd = sd(uvb),min=min(uvb),max=max(uvb)),caption="Descriptive statistics",digits = 2)
+
+p1 = ggplot(data,aes(x=nation,y=uvb))+
+  geom_boxplot()+
+  ggtitle("Uvb by nation")+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+p2 = ggplot(data,aes(x=nation,y=deaths))+
+  geom_boxplot()+
+  ggtitle("Deaths by nation")+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+grid.arrange(p1, p2, ncol=2)
+
+ggplot(data,aes(x=deaths))+
+  geom_histogram()+
+  #facet_grid(nation ~ .)+
+  ggtitle("Deaths count")
+
+
+```
+
+As we can see from a comparison with Table 3 of the paper the values are not the same, since they used a non centered parametrization.
+![Figure 3 paper](./fig3paper.png)
+
+## Correlation plots
+```{r}
+dataReduced = data %>%select(-c(nation,region,county))
+ggpairs( dataReduced ) 
+```
+
+## Modelling
+The model proposed is a doubly nested negative binomial model
