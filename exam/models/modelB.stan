@@ -76,10 +76,10 @@ model {
   alpha ~ normal(4.5,1);
   beta ~ normal(0,1);
   //weakly informative prior on the standard deviation
-  sigma_reg ~ gamma(3,0.5);
-  sigma_nat ~ gamma(3,0.5);
-  sigma_beta_reg ~ gamma(3,0.5);
-  sigma_beta_nat ~ gamma(3,0.5);
+  sigma_reg ~ gamma(9,20);
+  sigma_nat ~ gamma(9,20);
+  sigma_beta_reg ~  gamma(9,20);
+  sigma_beta_nat ~  gamma(9,20);
   //distribution of the varying intercept
   dev_reg ~ normal(0,sigma_reg);
   dev_nat ~ normal(0,sigma_nat);
