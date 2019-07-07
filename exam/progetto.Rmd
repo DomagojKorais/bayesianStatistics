@@ -22,9 +22,20 @@ library(loo)
 library(caret)
 library(rstan)
 library(knitr)
+library(loo)
 
 data = Mmmec
 set.seed(pi)
+
+
+
+#function for loo from stan model
+custom_loo = function(fitted_stan_model){
+  log_lik_slopes = extract_log_lik(fitted_stan_model)
+  loo_slopes <- loo(log_lik_slopes)
+  return(loo_slopes)
+}
+
 ```
 # Project aim and description
 In this project I studied the relationship between UVB radiation and melanoma mortality rate. Additionaly a comparison with the following paper has been performed:

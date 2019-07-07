@@ -33,7 +33,8 @@ transformed parameters {
 //varying intercepts
   vector[J] alpha_nat; //nations level
   vector[L] alpha_reg;//regions level
-  
+  real var_reg = sigma_reg^2;
+  real var_nat = sigma_nat^2;
 
 
 //real<lower=0> lambda[N];
@@ -56,11 +57,11 @@ alpha_reg[l] = alpha_nat[nationWithinRegion[l]] + dev_reg[l];
 
 model {
 
-alpha ~ gamma(3,0.5);
+alpha ~ gamma(3,1);
 beta ~ normal(0,1);
 //weakly informative prior on the standard deviation
-sigma_reg ~ gamma(3,0.5);
-sigma_nat ~ gamma(3,0.5);
+sigma_reg ~ gamma(9,20);
+sigma_nat ~ gamma(9,20);
 //distribution of the varying intercept
 dev_reg ~ normal(0,sigma_reg);
 dev_nat ~ normal(0,sigma_nat);
