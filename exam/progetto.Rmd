@@ -106,10 +106,153 @@ As we can see from a comparison with Table 3 of the paper the values are not the
 ![Figure 3 paper](./fig3paper.png)
 
 ## Correlation plots
-```{r}
+```{r correlation}
 dataReduced = data %>%select(-c(nation,region,county))
 ggpairs( dataReduced ) 
 ```
 
-## Modelling
-The model proposed is a doubly nested negative binomial model
+# Modelling
+The model proposed is a doubly nested negative binomial model, two models are presented: model A and model B.
+
+```{r model comparison}
+#import models
+modelA=readRDS("models/modelA.stanModel")
+modelB=readRDS("models/modelB.stanModel")
+
+loo_A  = custom_loo(modelA)
+loo_B  = custom_loo(modelB)
+print(loo_compare(loo_A,loo_B)) #model B wins
+
+#std residuals modelA
+
+#modelA
+y_rep = as.matrix(modelA, pars = "y_rep")
+y_rep_values = y_rep[1:length(data$deaths),]
+mean_inv_phi <- mean(as.matrix(modelA, pars = "inv_phi"))
+mean_y_rep <- colMeans(y_rep)
+std_resid <- (data$deaths - mean_y_rep) / sqrt(mean_y_rep + mean_y_rep^2*mean_inv_phi)
+plotData=data.frame(std_resid,mean_y_rep)
+ggplot(plotData,aes(x=mean_y_rep,y=std_resid))+
+  geom_point()+
+  geom_hline(yintercept = 2,color="red")+
+  geom_hline(yintercept = -2,color = "red")+
+  geom_hline(yintercept = 3,color="green")+
+  geom_hline(yintercept = -3,color = "green")+
+  ggtitle("Std residuals for model A ")
+
+#modelB
+y_rep = as.matrix(modelB, pars = "y_rep")
+y_rep_values = y_rep[1:length(data$deaths),]
+mean_inv_phi <- mean(as.matrix(modelB, pars = "inv_phi"))
+mean_y_rep <- colMeans(y_rep)
+std_resid <- (data$deaths - mean_y_rep) / sqrt(mean_y_rep + mean_y_rep^2*mean_inv_phi)
+plotData=data.frame(std_resid,mean_y_rep)
+ggplot(plotData,aes(x=mean_y_rep,y=std_resid))+
+  geom_point()+
+  geom_hline(yintercept = 2,color="red")+
+  geom_hline(yintercept = -2,color = "red")+
+  geom_hline(yintercept = 3,color="green")+
+  geom_hline(yintercept = -3,color = "green")+
+  ggtitle("Std residuals for model B ")
+
+
+#posterior checks model A
+
+fit_A = as.matrix(modelA)
+paper_results=data.frame(var_nat=0.105,var_reg=0.0147)
+mcmc_areas(fit_A,regex_pars = "var",prob = 0.95)+
+  geom_vline(data = paper_results, xintercept = paper_results$var_nat ,color="green")+
+  geom_vline(data = paper_results, xintercept = paper_results$var_reg,color="red")+
+  annotate("text", x = paper_results$var_nat, y = 1.5, label = "var_nat paper")+
+  annotate("text", x = paper_results$var_reg, y = 1.8, label = "var_reg paper")
+
+mcmc_intervals(fit_A,pars = "alpha")
+mcmc_intervals(fit_A,regex_pars = "sigma")
+mcmc_intervals(fit_A,regex_pars = "^alpha_nat")
+mcmc_intervals(fit_A,regex_pars = "^alpha_reg")
+
+list_of_draws=extract(modelA)
+dev=data.frame(
+  alpha=mean(list_of_draws$alpha),
+  alpha_sd=sd(list_of_draws$alpha),
+  beta=mean(list_of_draws$beta),
+  beta_sd=sd(list_of_draws$beta),
+  sigma_nat=mean(list_of_draws$sigma_nat),
+  sigma_nat_sd=sd(list_of_draws$sigma_nat),
+  sigma_reg=mean(list_of_draws$sigma_reg),
+  sigma_reg_sd=sd(list_of_draws$sigma_reg)
+)
+
+modelA_pars = dev 
+
+
+#posterior checks model B 
+fit_B = as.matrix(modelB)
+paper_results=data.frame(var_nat=0.105,var_reg=0.0147)
+mcmc_areas(fit_B,regex_pars = "var",prob = 0.95)+
+  geom_vline(data = paper_results, xintercept = paper_results$var_nat ,color="green")+
+  geom_vline(data = paper_results, xintercept = paper_results$var_reg,color="red")+
+  annotate("text", x = paper_results$var_nat, y = 1.5, label = "var_nat paper")+
+  annotate("text", x = paper_results$var_reg, y = 1.8, label = "var_reg paper")
+
+mcmc_intervals(fit_B,pars = "alpha")
+mcmc_intervals(fit_B,regex_pars = "sigma")
+mcmc_intervals(fit_B,regex_pars = "^beta_nat")
+mcmc_intervals(fit_B,regex_pars = "^alpha_nat")
+mcmc_intervals(fit_B,regex_pars = "^alpha_reg")
+mcmc_intervals(fit_B,regex_pars = "^beta_reg")
+
+list_of_draws=extract(modelB)
+dev=data.frame(
+  alpha=mean(list_of_draws$alpha),
+  alpha_sd=sd(list_of_draws$alpha),
+  beta=mean(list_of_draws$beta),
+  beta_sd=sd(list_of_draws$beta),
+  sigma_nat=mean(list_of_draws$sigma_nat),
+  sigma_nat_sd=sd(list_of_draws$sigma_nat),
+  sigma_reg=mean(list_of_draws$sigma_reg),
+  sigma_reg_sd=sd(list_of_draws$sigma_reg),
+  sigma_beta_reg=mean(list_of_draws$sigma_beta_reg),
+  sigma_beta_reg_sd=sd(list_of_draws$sigma_beta_reg),
+  sigma_beta_nat=mean(list_of_draws$sigma_beta_nat),
+  sigma_beta_nat_sd=sd(list_of_draws$sigma_beta_nat),
+  cor_sigma_nat_beta = cor(list_of_draws$sigma_nat,list_of_draws$sigma_beta_nat),
+  cor_sigma_reg_beta = cor(list_of_draws$sigma_reg,list_of_draws$sigma_beta_reg)
+)
+
+modelB_pars = dev 
+#correlations
+cor(list_of_draws$sigma_nat,list_of_draws$sigma_beta_nat)
+cor(list_of_draws$sigma_reg,list_of_draws$sigma_beta_reg)
+
+
+ppc_dens_overlay(data$deaths,y_rep_values)+
+  ggtitle("Replicated vs real")
+y=data$deaths
+ppc_stat(y,y_rep_values,stat="mean")
+ppc_stat(y,y_rep_values,stat="sd")
+ppc_stat_grouped(y,y_rep_values,group=data$nation,stat="mean")+
+  ggtitle("Using exposures means comparison")
+ppc_stat_grouped(y,y_rep_values,group=data$nation,stat="sd")+
+  ggtitle("Using exposures sd comparison")
+ppc_stat_grouped(y,y_rep_values,group=data$nation,stat="min")+
+  ggtitle("Using exposures min comparison")
+ppc_stat_grouped(y,y_rep_values,group=data$nation,stat="max")+
+  ggtitle("Using exposures max comparison")
+ppc_ecdf_overlay(y,y_rep)
+ppc_intervals(y,y_rep)
+
+
+
+
+```
+
+# Comparison with paper
+
+```{r compare with paper results}
+paper=data.frame(parameter=c("alpha","beta","var_nat","var_reg","cor_nat","cor_reg","var_nat_beta","var_reg_beta"),
+                 modelA_mean=c(0.0103,-0.0360,0.140,0.0424,NaN,NaN,NaN,NaN),
+                 modelA_sd=c(0.134,0.0107,0.0733,0.00956,NaN,NaN,NaN,NaN),
+                 modelB_mean=c(0.189,0.00435,0.105,0.0147,0.00540,-0.00336,0.00486,0.000745),
+                 modelB_sd=c(0.143,0.0329,0.0746,0.00498,0.00123,0.000938,0.00368,0.000252))
+```
