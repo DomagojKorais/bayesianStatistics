@@ -26,6 +26,8 @@ library(loo)
 
 data = Mmmec
 set.seed(pi)
+#recompute stan models?
+recompute=FALSE
 
 
 
@@ -114,10 +116,64 @@ ggpairs( dataReduced )
 # Modelling
 The model proposed is a doubly nested negative binomial model, two models are presented: model A and model B.
 
+## model A:
+$$count_{ijk}=NB(ln(O_{ijk}),\phi)$$
+$$ln(O_{ijk}) = ln(E_{ijk})+\alpha+\beta*UVB_{ijk} +s_k+u_{jk}+e_{ijk})$$
+$$s_k\sim N(0,\sigma^2_{s}) $$
+$$u_{jk}\sim N(0,\sigma^2_{u}) $$
+
+## model B:
+
+$$ln(O_{ijk}) = ln(E_{ijk})+\alpha+\beta*UVB_{ijk} +s_k +$$
+$$ + t_k*UVB_{ijk} + u_{jk} + v_{jk}*UVB_{ijk} + e_{ijk}+u_{jk}+e_{ijk})$$
+$$s_k\sim N(0,\sigma^2_{s}) $$
+
+$$t_{k}\sim N(0,\sigma^2_{t}) $$
+
+$$u_{jk}\sim N(0,\sigma^2_{u}) $$
+$$v_{jk}\sim N(0,\sigma^2_{v}) $$
+
+
+
+
 ```{r model comparison}
 #import models
 modelA=readRDS("models/modelA.stanModel")
 modelB=readRDS("models/modelB.stanModel")
+
+
+if(recompute){
+  #preparing data transforming factors in integers
+data2=data
+data2$region_id = as.integer(factor(data$region, levels = unique(data$region)))
+data2$nation_id = as.integer(factor(data$nation, levels = unique(data$nation)))
+nationLookupVec <- as.integer(unique(data2[c("region","nation")])[,"nation"])
+
+stan_data =
+  with(data2,
+       list(
+            N = length(deaths),
+            L = length(unique(groupingL2)),
+            J = length(unique(groupingL3)),
+            deaths = deaths,
+            uvb = uvb,
+            population = log(expected),
+            region_id = region_id,
+            nation_id = nation_id,
+            nationWithinRegion = nationLookupVec 
+            )
+       )
+  model_b_stan = rstan::stan_model("models/modelB.stan")
+  fitted_b_stan <- rstan::sampling(model_b_stan,
+                                   data = stan_data,
+                                   chains = 1, 
+                                   cores = 1,
+                                   iter = 1000, 
+                                   control = list(adapt_delta = 0.80, max_treedepth=10),verbose=TRUE,seed=4)
+
+  modelB=fitted_b_stan
+  saveRDS(modelB,"models/modelB.stanModel")
+}
 
 loo_A  = custom_loo(modelA)
 loo_B  = custom_loo(modelB)
@@ -131,8 +187,8 @@ y_rep_values = y_rep[1:length(data$deaths),]
 mean_inv_phi <- mean(as.matrix(modelA, pars = "inv_phi"))
 mean_y_rep <- colMeans(y_rep)
 std_resid <- (data$deaths - mean_y_rep) / sqrt(mean_y_rep + mean_y_rep^2*mean_inv_phi)
-plotData=data.frame(std_resid,mean_y_rep)
-ggplot(plotData,aes(x=mean_y_rep,y=std_resid))+
+plotData=data.frame(data,std_resid,mean_y_rep)
+ggplot(plotData,aes(x=mean_y_rep,y=std_resid,color=nation))+
   geom_point()+
   geom_hline(yintercept = 2,color="red")+
   geom_hline(yintercept = -2,color = "red")+
@@ -146,8 +202,8 @@ y_rep_values = y_rep[1:length(data$deaths),]
 mean_inv_phi <- mean(as.matrix(modelB, pars = "inv_phi"))
 mean_y_rep <- colMeans(y_rep)
 std_resid <- (data$deaths - mean_y_rep) / sqrt(mean_y_rep + mean_y_rep^2*mean_inv_phi)
-plotData=data.frame(std_resid,mean_y_rep)
-ggplot(plotData,aes(x=mean_y_rep,y=std_resid))+
+plotData=data.frame(data,std_resid,mean_y_rep)
+ggplot(plotData,aes(x=mean_y_rep,y=std_resid,color=nation))+
   geom_point()+
   geom_hline(yintercept = 2,color="red")+
   geom_hline(yintercept = -2,color = "red")+
@@ -255,4 +311,51 @@ paper=data.frame(parameter=c("alpha","beta","var_nat","var_reg","cor_nat","cor_r
                  modelA_sd=c(0.134,0.0107,0.0733,0.00956,NaN,NaN,NaN,NaN),
                  modelB_mean=c(0.189,0.00435,0.105,0.0147,0.00540,-0.00336,0.00486,0.000745),
                  modelB_sd=c(0.143,0.0329,0.0746,0.00498,0.00123,0.000938,0.00368,0.000252))
+modelA_estimates = summary(modelA,pars=c("alpha","beta","var_nat","var_reg"))$summary
+modelA_estimates = data.frame(parameter = rownames(modelA_estimates),modelA_estimates)
+modelB_estimates = summary(modelB,pars=c("alpha","beta","var_nat","var_reg"))$summary
+modelB_estimates = data.frame(parameter = rownames(modelB_estimates),modelB_estimates)
+
+joinA = inner_join(paper,modelA_estimates,by="parameter")
+joinB = inner_join(paper,modelB_estimates,by="parameter")
+
+kable(joinA%>%filter(modelA_mean>X25. && modelA_mean<X75.),caption = "Model A values between 25 and 75 percentiles")
+kable(joinB%>%filter(modelB_mean>X25. && modelB_mean<X75.),caption = "Model B values between 25 and 75 percentiles")
+
+#figure 2 
+fit=modelB
+#retrive parameters of interest (sd)
+list_of_draws=extract(fit)
+sigma_nat=mean(list_of_draws$sigma_nat)
+sigma_nat_sd=sd(list_of_draws$sigma_nat)
+sigma_reg=mean(list_of_draws$sigma_reg)
+sigma_reg_sd=sd(list_of_draws$sigma_reg)
+sigma_beta_reg=mean(list_of_draws$sigma_beta_reg)
+sigma_beta_reg_sd=sd(list_of_draws$sigma_beta_reg)
+sigma_beta_nat=mean(list_of_draws$sigma_beta_nat)
+sigma_beta_nat_sd=sd(list_of_draws$sigma_beta_nat)
+#fitted parameters
+alpha=mean(list_of_draws$alpha)
+beta=mean(list_of_draws$beta)
+#variations on nation level
+beta_nat=colMeans(list_of_draws$beta_nat)
+beta_nat_sd = apply(list_of_draws$beta_nat, 2, sd)
+alpha_nat=colMeans(list_of_draws$alpha_nat)
+alpha_nat_sd = apply(list_of_draws$alpha_nat, 2, sd)
+#rate
+eta = colMeans(list_of_draws$eta_rep)
+#putting all together
+coeff = data.frame(nation=unique(data$nation),beta=beta_nat,beta_nat_sd,alpha = alpha_nat,alpha_nat_sd)
+#plot figure 2
+#plot slopes
+ggplot(data=data,aes(x=uvb,y=log(eta),color=nation))+
+  geom_point()+
+  geom_abline(data=coeff,aes(slope= beta,intercept=alpha,colour=nation))+
+  ylim(-1,1)+
+  xlim(-9,15)+
+  ggtitle("Random slopes and intercepts like in figure 1")
+
+
 ```
+
+![Figure 1](./fig1.png)
