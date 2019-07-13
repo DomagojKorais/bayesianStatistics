@@ -5,11 +5,13 @@ date: "June 17, 2019"
 output: 
   html_document:
     toc: true
+editor_options: 
+  chunk_output_type: console
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE)
-knitr::opts_chunk$set(cache = TRUE)
+knitr::opts_chunk$set(cache = FALSE)
 knitr::opts_chunk$set(message=FALSE)
 knitr::opts_chunk$set(warning = FALSE)
 library(tidyverse)
@@ -125,7 +127,7 @@ $$u_{jk}\sim N(0,\sigma^2_{u}) $$
 ## model B:
 
 $$ln(O_{ijk}) = ln(E_{ijk})+\alpha+\beta*UVB_{ijk} +s_k +$$
-$$ + t_k*UVB_{ijk} + u_{jk} + v_{jk}*UVB_{ijk} + e_{ijk}+u_{jk}+e_{ijk})$$
+$$ + t_k*UVB_{ijk} + u_{jk} + v_{jk}*UVB_{ijk} + e_{ijk})$$
 $$s_k\sim N(0,\sigma^2_{s}) $$
 
 $$t_{k}\sim N(0,\sigma^2_{t}) $$
@@ -144,35 +146,50 @@ modelB=readRDS("models/modelB.stanModel")
 
 if(recompute){
   #preparing data transforming factors in integers
-data2=data
-data2$region_id = as.integer(factor(data$region, levels = unique(data$region)))
-data2$nation_id = as.integer(factor(data$nation, levels = unique(data$nation)))
-nationLookupVec <- as.integer(unique(data2[c("region","nation")])[,"nation"])
+  data2=data
+  groupingL3=data$nation
+  groupingL2=data$region
+  groupingL1=data$county
+  data2$region_id = as.integer(factor(data$region, levels = unique(data$region)))
+  data2$nation_id = as.integer(factor(data$nation, levels = unique(data$nation)))
+  nationLookupVec <- as.integer(unique(data2[c("region","nation")])[,"nation"])
 
-stan_data =
-  with(data2,
-       list(
-            N = length(deaths),
-            L = length(unique(groupingL2)),
-            J = length(unique(groupingL3)),
-            deaths = deaths,
-            uvb = uvb,
-            population = log(expected),
-            region_id = region_id,
-            nation_id = nation_id,
-            nationWithinRegion = nationLookupVec 
-            )
-       )
+  stan_data =
+    with(data2,
+         list(
+              N = length(deaths),
+              L = length(unique(groupingL2)),
+              J = length(unique(groupingL3)),
+              deaths = deaths,
+              uvb = uvb,
+              population = log(expected),
+              region_id = region_id,
+              nation_id = nation_id,
+              nationWithinRegion = nationLookupVec 
+              )
+         )
   model_b_stan = rstan::stan_model("models/modelB.stan")
   fitted_b_stan <- rstan::sampling(model_b_stan,
                                    data = stan_data,
-                                   chains = 1, 
-                                   cores = 1,
-                                   iter = 1000, 
+                                   chains = 4, 
+                                   cores = 4,
+                                   iter = 4000, 
                                    control = list(adapt_delta = 0.80, max_treedepth=10),verbose=TRUE,seed=4)
 
   modelB=fitted_b_stan
   saveRDS(modelB,"models/modelB.stanModel")
+  
+    model_a_stan = rstan::stan_model("models/modelA.stan")
+  fitted_a_stan <- rstan::sampling(model_a_stan,
+                                   data = stan_data,
+                                   chains = 4, 
+                                   cores = 4,
+                                   iter = 4000, 
+                                   control = list(adapt_delta = 0.80, max_treedepth=10),verbose=TRUE,seed=4)
+
+  modelA=fitted_a_stan
+  saveRDS(modelA,"models/modelA.stanModel")
+  
 }
 
 loo_A  = custom_loo(modelA)
@@ -213,34 +230,34 @@ ggplot(plotData,aes(x=mean_y_rep,y=std_resid,color=nation))+
 
 
 #posterior checks model A
-
-fit_A = as.matrix(modelA)
-paper_results=data.frame(var_nat=0.105,var_reg=0.0147)
-mcmc_areas(fit_A,regex_pars = "var",prob = 0.95)+
-  geom_vline(data = paper_results, xintercept = paper_results$var_nat ,color="green")+
-  geom_vline(data = paper_results, xintercept = paper_results$var_reg,color="red")+
-  annotate("text", x = paper_results$var_nat, y = 1.5, label = "var_nat paper")+
-  annotate("text", x = paper_results$var_reg, y = 1.8, label = "var_reg paper")
-
-mcmc_intervals(fit_A,pars = "alpha")
-mcmc_intervals(fit_A,regex_pars = "sigma")
-mcmc_intervals(fit_A,regex_pars = "^alpha_nat")
-mcmc_intervals(fit_A,regex_pars = "^alpha_reg")
-
-list_of_draws=extract(modelA)
-dev=data.frame(
-  alpha=mean(list_of_draws$alpha),
-  alpha_sd=sd(list_of_draws$alpha),
-  beta=mean(list_of_draws$beta),
-  beta_sd=sd(list_of_draws$beta),
-  sigma_nat=mean(list_of_draws$sigma_nat),
-  sigma_nat_sd=sd(list_of_draws$sigma_nat),
-  sigma_reg=mean(list_of_draws$sigma_reg),
-  sigma_reg_sd=sd(list_of_draws$sigma_reg)
-)
-
-modelA_pars = dev 
-
+if(FALSE){
+  fit_A = as.matrix(modelA)
+  paper_results=data.frame(var_nat=0.105,var_reg=0.0147)
+  mcmc_areas(fit_A,regex_pars = "var",prob = 0.95)+
+    geom_vline(data = paper_results, xintercept = paper_results$var_nat ,color="green")+
+    geom_vline(data = paper_results, xintercept = paper_results$var_reg,color="red")+
+    annotate("text", x = paper_results$var_nat, y = 1.5, label = "var_nat paper")+
+    annotate("text", x = paper_results$var_reg, y = 1.8, label = "var_reg paper")
+  
+  mcmc_intervals(fit_A,pars = "alpha")
+  mcmc_intervals(fit_A,regex_pars = "sigma")
+  mcmc_intervals(fit_A,regex_pars = "^alpha_nat")
+  mcmc_intervals(fit_A,regex_pars = "^alpha_reg")
+  
+  list_of_draws=extract(modelA)
+  dev=data.frame(
+    alpha=mean(list_of_draws$alpha),
+    alpha_sd=sd(list_of_draws$alpha),
+    beta=mean(list_of_draws$beta),
+    beta_sd=sd(list_of_draws$beta),
+    sigma_nat=mean(list_of_draws$sigma_nat),
+    sigma_nat_sd=sd(list_of_draws$sigma_nat),
+    sigma_reg=mean(list_of_draws$sigma_reg),
+    sigma_reg_sd=sd(list_of_draws$sigma_reg)
+  )
+  
+  modelA_pars = dev 
+}
 
 #posterior checks model B 
 fit_B = as.matrix(modelB)
@@ -255,8 +272,8 @@ mcmc_intervals(fit_B,pars = "alpha")
 mcmc_intervals(fit_B,regex_pars = "sigma")
 mcmc_intervals(fit_B,regex_pars = "^beta_nat")
 mcmc_intervals(fit_B,regex_pars = "^alpha_nat")
-mcmc_intervals(fit_B,regex_pars = "^alpha_reg")
-mcmc_intervals(fit_B,regex_pars = "^beta_reg")
+mcmc_intervals(fit_B,regex_pars = "^dev_reg")
+mcmc_intervals(fit_B,regex_pars = "^dev_beta_reg")
 
 list_of_draws=extract(modelB)
 dev=data.frame(
@@ -280,7 +297,9 @@ modelB_pars = dev
 #correlations
 cor(list_of_draws$sigma_nat,list_of_draws$sigma_beta_nat)
 cor(list_of_draws$sigma_reg,list_of_draws$sigma_beta_reg)
-
+#beta_nat
+colMeans(list_of_draws$beta_nat)
+apply(list_of_draws$beta_nat,2,sd)
 
 ppc_dens_overlay(data$deaths,y_rep_values)+
   ggtitle("Replicated vs real")
@@ -311,16 +330,26 @@ paper=data.frame(parameter=c("alpha","beta","var_nat","var_reg","cor_nat","cor_r
                  modelA_sd=c(0.134,0.0107,0.0733,0.00956,NaN,NaN,NaN,NaN),
                  modelB_mean=c(0.189,0.00435,0.105,0.0147,0.00540,-0.00336,0.00486,0.000745),
                  modelB_sd=c(0.143,0.0329,0.0746,0.00498,0.00123,0.000938,0.00368,0.000252))
+table_5_paper=data.frame(nation=unique(data$nation),
+                         estimate = c(0.0244,-0.0133,-0.0706,-0.0010,0.0770,-0.0481,0.0243,0.0048,0.0005),
+                         sd=c(0.0626,0.0441,0.0715,0.0394,0.0486,0.0398,0.0583,0.0618,0.0557))
+
 modelA_estimates = summary(modelA,pars=c("alpha","beta","var_nat","var_reg"))$summary
 modelA_estimates = data.frame(parameter = rownames(modelA_estimates),modelA_estimates)
 modelB_estimates = summary(modelB,pars=c("alpha","beta","var_nat","var_reg"))$summary
 modelB_estimates = data.frame(parameter = rownames(modelB_estimates),modelB_estimates)
+modelB_beta_estimates = summary(modelB,pars=c("beta_nat"))$summary
+modelB_beta_estimates = data.frame(nation = unique(data$nation),modelB_beta_estimates)
 
 joinA = inner_join(paper,modelA_estimates,by="parameter")
 joinB = inner_join(paper,modelB_estimates,by="parameter")
+joinBeta =inner_join(table_5_paper,modelB_beta_estimates,by="nation")
 
 kable(joinA%>%filter(modelA_mean>X25. && modelA_mean<X75.),caption = "Model A values between 25 and 75 percentiles")
 kable(joinB%>%filter(modelB_mean>X25. && modelB_mean<X75.),caption = "Model B values between 25 and 75 percentiles")
+kable(joinBeta%>%mutate(delta_sd=(sd.y-sd.x)/sd.x*100)%>%
+  arrange(delta_sd)%>%filter(estimate>X2.5. && estimate<X97.5.),caption = "Beta pooled values between 2.5 and 97.5 percentiles")
+
 
 #figure 2 
 fit=modelB
@@ -349,11 +378,12 @@ coeff = data.frame(nation=unique(data$nation),beta=beta_nat,beta_nat_sd,alpha = 
 #plot figure 2
 #plot slopes
 ggplot(data=data,aes(x=uvb,y=log(eta),color=nation))+
-  geom_point()+
+  #geom_point()+
   geom_abline(data=coeff,aes(slope= beta,intercept=alpha,colour=nation))+
   ylim(-1,1)+
   xlim(-9,15)+
   ggtitle("Random slopes and intercepts like in figure 1")
+
 
 
 ```

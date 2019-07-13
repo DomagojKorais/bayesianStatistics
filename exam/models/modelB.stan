@@ -95,14 +95,14 @@ model {
 } 
 
 generated quantities {
-  //real eta_rep[N];
+  real eta_rep[N];
   int y_rep[N];
   vector[N] log_lik;
   
   for (n in 1:N) {
 
     real eta_n = alpha_reg[region_id[n]] + beta_reg[region_id[n]] .* uvb[n] + population[n];
-    //eta_rep[n]=eta_n;
+    eta_rep[n]=eta_n;
     y_rep[n] = neg_binomial_2_log_safe_rng(eta_n, phi);
     log_lik[n] = neg_binomial_2_log_lpmf(deaths[n]| eta_n, phi);
 
