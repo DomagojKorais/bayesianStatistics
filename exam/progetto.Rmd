@@ -42,20 +42,23 @@ custom_loo = function(fitted_stan_model){
 
 ```
 # Project aim and description
-In this project I studied the relationship between UVB radiation and melanoma mortality rate. Additionaly a comparison with the following paper has been performed:
+In this project I studied the relationship between __UVB dose__ and __melanoma mortality rate__, using a __hierarchical__ model to account for the multilevel grouping of the data.
+Additionaly a comparison with the following paper has been performed:
 <blockquote>
 <p>Langford, I.H., Bentham, G. and McDonald, A. (1998). Multilevel modelling of geographically aggregated health data: a case study on malignant melanoma mortality and UV exposure in the European community. <em>Statistics in Medicine</em>, <em>17</em>, 41-58.</p>
 </blockquote>
 
+[Link to the paper](https://onlinelibrary.wiley.com/doi/abs/10.1002/%28SICI%291097-0258%2819980115%2917%3A1%3C41%3A%3AAID-SIM712%3E3.0.CO%3B2-0)
+
 # Dataset description
 
 This dataset describes the mortality rate of malignent melanoma in eight European countries.
-The reference is the following: 
+The reference of the R package is the following: 
 
-<blockquote>
-https://www.rdocumentation.org/packages/R2MLwiN/versions/0.8-6/topics/mmmec
-</blockquote>
+[mmmec library](https://www.rdocumentation.org/packages/R2MLwiN/versions/0.8-6/topics/mmmec)
 
+
+## Variables
 There is a total of six variables and 354 observations:
 <ul>
 <li><code>nation</code> a factor with levels <code>Belgium</code>, <code>W.Germany</code>, <code>Denmark</code>, <code>France</code>, <code>UK</code>, <code>Italy</code>, <code>Ireland</code>, <code>Luxembourg</code>, and <code>Netherlands</code></li>
@@ -71,18 +74,23 @@ Ireland, Germany, Italy and The Netherlands, data were only available from 1975â
 
 ```** in the paper the measure is not centered```
 
-The data are geographically nested, since nations are divided in regions, and regions are divided in counties. 
+The data are __geographically nested__, since nations are divided in regions, and regions are divided in counties. 
 A county is the smallest area forwich we have data.
 
-Here is a schema of the nesting:
+## Hierarchy
 ![Nesting schema](./nesting.png)
 And relative counts:
 ```{r counting elements}
-kable(data%>%group_by(nation)%>%summarise(regions=n_distinct(region),counties=n_distinct(county)),caption = "Data hierarchy")
+nesting=data%>%group_by(nation)%>%summarise(regions=n_distinct(region),counties=n_distinct(county))
+nesting$number = 1:nrow(nesting) 
+kable(nesting%>%select(number,everything()),caption = "Data hierarchy")
 ```
 
-# EDA
+As we can see the groupings are very eterogenious between nations.
 
+# Explorative data analysis
+
+Let's check the distributions of the variables in the dataset.
 ```{r descriptive statistics for centered UVB variable }
 
 
@@ -107,6 +115,7 @@ kable(data%>%group_by(nation)%>%summarise(N=n(),mean=mean(uvb),sd = sd(uvb),min=
 ```
 
 As we can see from a comparison with Table 3 of the paper the values are not the same, since they used a non centered parametrization.
+
 ![Figure 3 paper](./fig3paper.png)
 
 ## Correlation plots
@@ -115,12 +124,22 @@ dataReduced = data %>%select(-c(nation,region,county))
 ggpairs( dataReduced ) 
 ```
 
+There is no linear relation between deaths and uvb.
+
 # Modelling
-The model proposed is a doubly nested negative binomial model, two models are presented: model A and model B, they reflect the models of the paper but with a negative binomial instead of a Poisson distribution.
+
+## Goals
+The model proposed is a __double nested negative binomial model__, two models are presented: model A and model B, they reflect the models of the paper but with a negative binomial instead of a Poisson distribution.
 The nesting is performed on nations, and for every nation on the regions.
 
+The model focus on two aspects:
+
+- investigate the importance of nested nature of the data (both for model accuracy and variance analysis)
+
+- investigate the relation between UVB dose and mortality rate
+
 ## model A:
-$$count_{ijk}=NB(ln(O_{ijk}),\phi)$$
+$$deaths_{ijk}=NB(ln(O_{ijk}),\phi)$$
 $$ln(O_{ijk}) = ln(E_{ijk})+\alpha+\beta*UVB_{ijk} +s_k+u_{jk}+e_{ijk}$$
 $$s_k\sim N(0,\sigma^2_{s}) $$
 $$u_{jk}\sim N(0,\sigma^2_{u}) $$
@@ -147,14 +166,17 @@ explanation of the symbols:
 
 
 ## Stan code used for model B:
+The model has been runned using 4 chains, a warmup period of 2000 and 4000 iterations, leaving other parameters as default ones.
+To replicate the results compile this same Rmd file changing setting <code>recompute=TRUE</code> in the setup section.
 ```{r model implementation}
 modelB_priors=readRDS("models/modelB_priors.stanModel")
 code <- get_stancode(modelB_priors)
 cat(code)
+a=1
 ```
 
 
-```{r model comparison}
+```{r model computations}
 #import models
 modelA=readRDS("models/modelA.stanModel")
 modelB=readRDS("models/modelB.stanModel")
@@ -220,10 +242,21 @@ if(recompute){
   
 }
 
-loo_A  = custom_loo(modelA)
-loo_B  = custom_loo(modelB)
-loo_B_priors  = custom_loo(modelB_priors)
-print(loo_compare(loo_A,loo_B,loo_B_priors)) #model B wins
+
+
+
+
+
+```
+
+
+
+
+## Model checking
+
+### Residuals
+
+```{r residuals}
 
 #std residuals modelA
 
@@ -258,6 +291,57 @@ ggplot(plotData,aes(x=mean_y_rep,y=std_resid,color=nation))+
   ggtitle("Std residuals for model B ")
 
 
+
+```
+
+### Model comparison
+- model1 mathces modelA, 
+- model2 matches modelB with non informative priors 
+- model3 matches modelB with custom priors, selected in such a way to shorten the tails of posteriors distributions
+```{r model comparisons}
+loo_A  = custom_loo(modelA)
+loo_B  = custom_loo(modelB)
+loo_B_priors  = custom_loo(modelB_priors)
+kable(loo_compare(loo_A,loo_B,loo_B_priors),caption = "Loo comparisons") #model B wins
+
+```
+
+### Posterior predictive checks 
+As we can check from the following graphs the model fits well the data.
+```{r model checking}
+ppc_dens_overlay(data$deaths,y_rep_values)+
+  ggtitle("Replicated vs real")
+y=data$deaths
+p1 = ppc_stat(y,y_rep_values,stat="mean")+
+  ggtitle("Mean")
+p2=ppc_stat(y,y_rep_values,stat="sd")+
+  ggtitle("standard deviation")
+grid.arrange(p1, p2, ncol=2)
+
+ppc_stat_grouped(y,y_rep_values,group=data$nation,stat="mean")+
+  ggtitle("Nations means comparison")
+ppc_stat_grouped(y,y_rep_values,group=data$nation,stat="sd")+
+  ggtitle("Nations sd comparison")
+ppc_stat_grouped(y,y_rep_values,group=data$nation,stat="min")+
+  ggtitle("Nations min comparison")
+ppc_stat_grouped(y,y_rep_values,group=data$nation,stat="max")+
+  ggtitle("Nations max comparison")
+
+p1=ppc_ecdf_overlay(y,y_rep)+
+  ggtitle("Empirical distribution function")
+p2=ppc_intervals(y,y_rep)+
+  ggtitle("Intervals")
+grid.arrange(p1, p2, ncol=2)
+
+
+
+```
+
+## Model inferences
+
+
+### Variance
+```{r inferences variance }
 #posterior checks model A
 if(FALSE){
   fit_A = as.matrix(modelA)
@@ -295,14 +379,41 @@ mcmc_areas(fit_B,regex_pars = "var",prob = 0.95)+
   geom_vline(data = paper_results, xintercept = paper_results$var_nat ,color="green")+
   geom_vline(data = paper_results, xintercept = paper_results$var_reg,color="red")+
   annotate("text", x = paper_results$var_nat, y = 1.5, label = "var_nat paper")+
-  annotate("text", x = paper_results$var_reg, y = 1.8, label = "var_reg paper")
+  annotate("text", x = paper_results$var_reg, y = 1.8, label = "var_reg paper")+
+  ggtitle("Variance components")
 
-mcmc_intervals(fit_B,pars = "alpha")
-mcmc_intervals(fit_B,regex_pars = "sigma")
-mcmc_intervals(fit_B,regex_pars = "^beta_nat")
-mcmc_intervals(fit_B,regex_pars = "^alpha_nat")
-mcmc_intervals(fit_B,regex_pars = "^dev_reg")
-mcmc_intervals(fit_B,regex_pars = "^dev_beta_reg")
+
+#priors
+x = seq(0,1, length=100)
+y=dgamma(x, 10, 30)
+df=data.frame(x,y)
+p2=ggplot(df,aes(x=x,y=y))+
+  geom_line()+
+  ggtitle("Used prior (Gamma(10,30))")
+
+
+p1=mcmc_areas(fit_B,regex_pars = "sigma")+
+  ggtitle("Standard deviations")
+grid.arrange(p1, p2, ncol=2)
+
+```
+
+### Parameters
+
+```{r inferences paramas}
+ mcmc_areas(fit_B,pars = c("alpha","beta"))+
+  ggtitle("Fixed therms")
+
+p2 = mcmc_areas(fit_B,regex_pars = "^beta_nat")+
+  ggtitle("Beta at national level")
+p1 =mcmc_areas(fit_B,regex_pars = "^alpha_nat")+
+  ggtitle("Alpha at national level")
+grid.arrange(p1, p2, ncol=2)
+p1 = mcmc_intervals(fit_B,regex_pars = "^dev_reg")+
+  ggtitle("Alpha at regional level")
+p2 = mcmc_intervals(fit_B,regex_pars = "^dev_beta_reg")+
+  ggtitle("Beta at regional level")
+grid.arrange(p1, p2, ncol=2)
 
 list_of_draws=extract(modelB_priors)
 dev=data.frame(
@@ -331,29 +442,10 @@ colMeans(list_of_draws$beta_nat)
 apply(list_of_draws$beta_nat,2,sd)
 
 ```
-# Model checking
-
-```{r model checking}
-ppc_dens_overlay(data$deaths,y_rep_values)+
-  ggtitle("Replicated vs real")
-y=data$deaths
-ppc_stat(y,y_rep_values,stat="mean")
-ppc_stat(y,y_rep_values,stat="sd")
-ppc_stat_grouped(y,y_rep_values,group=data$nation,stat="mean")+
-  ggtitle("Using exposures means comparison")
-ppc_stat_grouped(y,y_rep_values,group=data$nation,stat="sd")+
-  ggtitle("Using exposures sd comparison")
-ppc_stat_grouped(y,y_rep_values,group=data$nation,stat="min")+
-  ggtitle("Using exposures min comparison")
-ppc_stat_grouped(y,y_rep_values,group=data$nation,stat="max")+
-  ggtitle("Using exposures max comparison")
-ppc_ecdf_overlay(y,y_rep)
-ppc_intervals(y,y_rep)
 
 
 
 
-```
 
 # Comparison with paper
 
