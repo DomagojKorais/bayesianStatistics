@@ -11,7 +11,7 @@ editor_options:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE)
-knitr::opts_chunk$set(cache = FALSE)
+knitr::opts_chunk$set(cache = TRUE)
 knitr::opts_chunk$set(message=FALSE)
 knitr::opts_chunk$set(warning = FALSE)
 library(tidyverse)
@@ -84,7 +84,7 @@ kable(data%>%group_by(nation)%>%summarise(regions=n_distinct(region),counties=n_
 # EDA
 
 ```{r descriptive statistics for centered UVB variable }
-kable(data%>%group_by(nation)%>%summarise(N=n(),mean=mean(uvb),sd = sd(uvb),min=min(uvb),max=max(uvb)),caption="Descriptive statistics",digits = 2)
+
 
 p1 = ggplot(data,aes(x=nation,y=uvb))+
   geom_boxplot()+
@@ -103,7 +103,7 @@ ggplot(data,aes(x=deaths))+
   #facet_grid(nation ~ .)+
   ggtitle("Deaths count")
 
-
+kable(data%>%group_by(nation)%>%summarise(N=n(),mean=mean(uvb),sd = sd(uvb),min=min(uvb),max=max(uvb)),caption="Descriptive statistics for UVB",digits = 2)
 ```
 
 As we can see from a comparison with Table 3 of the paper the values are not the same, since they used a non centered parametrization.
@@ -116,11 +116,12 @@ ggpairs( dataReduced )
 ```
 
 # Modelling
-The model proposed is a doubly nested negative binomial model, two models are presented: model A and model B.
+The model proposed is a doubly nested negative binomial model, two models are presented: model A and model B, they reflect the models of the paper but with a negative binomial instead of a Poisson distribution.
+The nesting is performed on nations, and for every nation on the regions.
 
 ## model A:
 $$count_{ijk}=NB(ln(O_{ijk}),\phi)$$
-$$ln(O_{ijk}) = ln(E_{ijk})+\alpha+\beta*UVB_{ijk} +s_k+u_{jk}+e_{ijk})$$
+$$ln(O_{ijk}) = ln(E_{ijk})+\alpha+\beta*UVB_{ijk} +s_k+u_{jk}+e_{ijk}$$
 $$s_k\sim N(0,\sigma^2_{s}) $$
 $$u_{jk}\sim N(0,\sigma^2_{u}) $$
 
@@ -135,13 +136,29 @@ $$t_{k}\sim N(0,\sigma^2_{t}) $$
 $$u_{jk}\sim N(0,\sigma^2_{u}) $$
 $$v_{jk}\sim N(0,\sigma^2_{v}) $$
 
+explanation of the symbols:
 
+- $i$ represents a county, $j$ represents a region and $k$ represents a nation.
+- $E_{ijk}$ is the exposure given in the dataset
+- $s_k$,$t_k$  the variations at national level
+- $u_{jk}$,$v_{jk}$are  the variations at regional level nested in nations
+- $e_{ijk}$ is the randdom variation at county level
+
+
+
+## Stan code used for model B:
+```{r model implementation}
+modelB_priors=readRDS("models/modelB_priors.stanModel")
+code <- get_stancode(modelB_priors)
+cat(code)
+```
 
 
 ```{r model comparison}
 #import models
 modelA=readRDS("models/modelA.stanModel")
 modelB=readRDS("models/modelB.stanModel")
+modelB_priors=readRDS("models/modelB_priors.stanModel")
 
 
 if(recompute){
@@ -168,7 +185,18 @@ if(recompute){
               nationWithinRegion = nationLookupVec 
               )
          )
-  model_b_stan = rstan::stan_model("models/modelB.stan")
+  model_b_stan_priors = rstan::stan_model("models/modelB_priors.stan")
+  fitted_b_stan_priors <- rstan::sampling(model_b_stan_priors,
+                                   data = stan_data,
+                                   chains = 4, 
+                                   cores = 4,
+                                   iter = 4000, 
+                                   control = list(adapt_delta = 0.80, max_treedepth=10),verbose=TRUE,seed=4)
+
+  modelB_priors=fitted_b_stan_priors
+  saveRDS(modelB_priors,"models/modelB_priors.stanModel")
+  
+   model_b_stan = rstan::stan_model("models/modelB.stan")
   fitted_b_stan <- rstan::sampling(model_b_stan,
                                    data = stan_data,
                                    chains = 4, 
@@ -194,7 +222,8 @@ if(recompute){
 
 loo_A  = custom_loo(modelA)
 loo_B  = custom_loo(modelB)
-print(loo_compare(loo_A,loo_B)) #model B wins
+loo_B_priors  = custom_loo(modelB_priors)
+print(loo_compare(loo_A,loo_B,loo_B_priors)) #model B wins
 
 #std residuals modelA
 
@@ -260,7 +289,7 @@ if(FALSE){
 }
 
 #posterior checks model B 
-fit_B = as.matrix(modelB)
+fit_B = as.matrix(modelB_priors)
 paper_results=data.frame(var_nat=0.105,var_reg=0.0147)
 mcmc_areas(fit_B,regex_pars = "var",prob = 0.95)+
   geom_vline(data = paper_results, xintercept = paper_results$var_nat ,color="green")+
@@ -275,7 +304,7 @@ mcmc_intervals(fit_B,regex_pars = "^alpha_nat")
 mcmc_intervals(fit_B,regex_pars = "^dev_reg")
 mcmc_intervals(fit_B,regex_pars = "^dev_beta_reg")
 
-list_of_draws=extract(modelB)
+list_of_draws=extract(modelB_priors)
 dev=data.frame(
   alpha=mean(list_of_draws$alpha),
   alpha_sd=sd(list_of_draws$alpha),
@@ -301,6 +330,10 @@ cor(list_of_draws$sigma_reg,list_of_draws$sigma_beta_reg)
 colMeans(list_of_draws$beta_nat)
 apply(list_of_draws$beta_nat,2,sd)
 
+```
+# Model checking
+
+```{r model checking}
 ppc_dens_overlay(data$deaths,y_rep_values)+
   ggtitle("Replicated vs real")
 y=data$deaths
@@ -336,9 +369,9 @@ table_5_paper=data.frame(nation=unique(data$nation),
 
 modelA_estimates = summary(modelA,pars=c("alpha","beta","var_nat","var_reg"))$summary
 modelA_estimates = data.frame(parameter = rownames(modelA_estimates),modelA_estimates)
-modelB_estimates = summary(modelB,pars=c("alpha","beta","var_nat","var_reg"))$summary
+modelB_estimates = summary(modelB_priors,pars=c("alpha","beta","var_nat","var_reg"))$summary
 modelB_estimates = data.frame(parameter = rownames(modelB_estimates),modelB_estimates)
-modelB_beta_estimates = summary(modelB,pars=c("beta_nat"))$summary
+modelB_beta_estimates = summary(modelB_priors,pars=c("beta_nat"))$summary
 modelB_beta_estimates = data.frame(nation = unique(data$nation),modelB_beta_estimates)
 
 joinA = inner_join(paper,modelA_estimates,by="parameter")
@@ -352,7 +385,7 @@ kable(joinBeta%>%mutate(delta_sd=(sd.y-sd.x)/sd.x*100)%>%
 
 
 #figure 2 
-fit=modelB
+fit=modelB_priors
 #retrive parameters of interest (sd)
 list_of_draws=extract(fit)
 sigma_nat=mean(list_of_draws$sigma_nat)
@@ -388,4 +421,9 @@ ggplot(data=data,aes(x=uvb,y=log(eta),color=nation))+
 
 ```
 
+
+## Conclusions
+
+The obtained results are compatible with those from the paper, there is a relation between UVB and death rates but it's not in any means obvious.
+It depends from the considered nation, so pooling the data on nations is of vital importance to perform a valid analysis
 ![Figure 1](./fig1.png)
