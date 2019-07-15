@@ -1,7 +1,8 @@
 ---
-title: "progetto"
+title: "Exam project for Bayesian statistics course"
+subtitle: "UNITS University, DSSC Master degree, year 2018/2019"
 author: "Domagoj Korais"
-date: "June 17, 2019"
+date: "July 16, 2019"
 output: 
   html_document:
     toc: true
@@ -70,12 +71,14 @@ There is a total of six variables and 354 observations:
 </ul>
 
 ```* for the United Kingdom,
-Ireland, Germany, Italy and The Netherlands, data were only available from 1975—1976 onwards ```
+Ireland, Germany, Italy and The Netherlands, data were only available from 1975—1976 onwards.
+This information is not present in the package documentation but only in the paper```
 
 ```** in the paper the measure is not centered```
 
 The data are __geographically nested__, since nations are divided in regions, and regions are divided in counties. 
 A county is the smallest area forwich we have data.
+
 
 ## Hierarchy
 ![Nesting schema](./nesting.png)
@@ -343,14 +346,21 @@ grid.arrange(p1, p2, ncol=2)
 
 The estimated parameters are graphically shown in the next plots: 
 The fixed therms are both compatible with 0, so are the region level ones.
-From the last plot it is clear that the relation between UVB index and death rates shows large variations between countries, in fact for __UK__, __Ireland__, __Belgium__, __France__, __Luxemburg__ we have a positive relation,  instead for __ W.Germany__, __Denmark__, __Italy__, __Netherland__ a negative one.
+From the last plot it is clear that the relation between UVB index and death rates shows large variations between countries, in fact for __UK__, __Ireland__, __Belgium__, __France__, __Luxemburg__ we have a positive relation,  instead for __W.Germany__, __Denmark__, __Italy__, __Netherland__ a negative one.
 This fact alone shows that in this kind of analysis taking into account the hierarchical nature of data is of paramount importance.
 
 ```{r fixed inferences paramas}
-fit_B = as.matrix(modelB_priors)
- mcmc_areas(fit_B,pars = c("alpha","beta"))+
-  ggtitle("Fixed therms")
 
+fit_A = as.matrix(modelA)
+p1=mcmc_areas(fit_A,pars = c("alpha","beta"))+
+  ggtitle("Fixed therms model A")
+ 
+ 
+fit_B = as.matrix(modelB_priors)
+ p2=mcmc_areas(fit_B,pars = c("alpha","beta"))+
+  ggtitle("Fixed therms model B")
+ 
+grid.arrange(p1, p2, ncol=2)
 ```
 
 ```{r national level inferences}
@@ -370,7 +380,7 @@ grid.arrange(p1, p2, ncol=2)
 
 ```
 
-```{r computed values, cache=FALSE}
+```{r computed values}
 list_of_draws=extract(modelB_priors)
 dev=data.frame(
   alpha=mean(list_of_draws$alpha),
@@ -595,9 +605,23 @@ kable(variances,digits = 2)
 
 ## Conclusions
 
-The obtained results are compatible with those from the paper, there is a relation between UVB and death rates but it's not in any means obvious.
-It depends from the considered nation, so pooling the data on nations is of vital importance to perform a valid analysis
+- The obtained results are compatible with those from the paper.
 
+- There is a relationship between UVB exposure and death rates but it is highly dependent on the nation.
+
+- The variance is much higher at national level, than between regions of the same nation.
+
+- Taking into account the hierarchical nature of data is of vital importance here, for example model A shows a spurious  negative correlation hxpoure and mortality rate, but this correlation disappears in model B.
+
+- It would be interesting to have more explanatory variables, and to have the mapping between regions/counties and their physical location, unfortunately I was not able to find this information anywhere, and the original cancer atlas from where data are taken is not aviable anywhere on the net.
+
+
+## Additional notes
+
+- I tried to do a pull request on the GitHub page of the package to fix the information about the dataset, but the GitHub page appears to be only a read-only mirror. 
+
+
+- Some fitted models exceeded the maximum size allowed by GitHub (100 Mb) and committing them blocked my work, I had to revert all my local changes to fix the problem, so take care committing compiling models.
 
 ## Appendix
 
