@@ -83,7 +83,7 @@ And relative counts:
 ```{r counting elements}
 nesting=data%>%group_by(nation)%>%summarise(regions=n_distinct(region),counties=n_distinct(county))
 nesting$number = 1:nrow(nesting) 
-kable(nesting%>%select(number,everything()),caption = "Data hierarchy")
+kable(nesting%>%select(number,everything()),caption = "Data hierarchy",digits = 2)
 ```
 
 As we can see the groupings are very eterogenious between nations.
@@ -302,7 +302,7 @@ ggplot(plotData,aes(x=mean_y_rep,y=std_resid,color=nation))+
 loo_A  = custom_loo(modelA)
 loo_B  = custom_loo(modelB)
 loo_B_priors  = custom_loo(modelB_priors)
-kable(loo_compare(loo_A,loo_B,loo_B_priors),caption = "Loo comparisons") #model B wins
+kable(loo_compare(loo_A,loo_B,loo_B_priors),caption = "Loo comparisons",digits = 2) #model B wins
 
 ```
 
@@ -339,6 +339,71 @@ grid.arrange(p1, p2, ncol=2)
 
 ## Model inferences
 
+### Parameters
+
+The estimated parameters are graphically shown in the next plots: 
+The fixed therms are both compatible with 0, so are the region level ones.
+From the last plot it is clear that the relation between UVB index and death rates shows large variations between countries, in fact for __UK__, __Ireland__, __Belgium__, __France__, __Luxemburg__ we have a positive relation,  instead for __ W.Germany__, __Denmark__, __Italy__, __Netherland__ a negative one.
+This fact alone shows that in this kind of analysis taking into account the hierarchical nature of data is of paramount importance.
+
+```{r fixed inferences paramas}
+fit_B = as.matrix(modelB_priors)
+ mcmc_areas(fit_B,pars = c("alpha","beta"))+
+  ggtitle("Fixed therms")
+
+```
+
+```{r national level inferences}
+p2 = mcmc_areas(fit_B,regex_pars = "^beta_nat")+
+  ggtitle("Beta at national level")
+p1 =mcmc_areas(fit_B,regex_pars = "^alpha_nat")+
+  ggtitle("Alpha at national level")
+grid.arrange(p1, p2, ncol=2)
+```
+
+```{r regional level inferences}
+p1 = mcmc_intervals(fit_B,regex_pars = "^dev_reg")+
+  ggtitle("Alpha at regional level")
+p2 = mcmc_intervals(fit_B,regex_pars = "^dev_beta_reg")+
+  ggtitle("Beta at regional level")
+grid.arrange(p1, p2, ncol=2)
+
+```
+
+```{r computed values, cache=FALSE}
+list_of_draws=extract(modelB_priors)
+dev=data.frame(
+  alpha=mean(list_of_draws$alpha),
+  alpha_sd=sd(list_of_draws$alpha),
+  beta=mean(list_of_draws$beta),
+  beta_sd=sd(list_of_draws$beta),
+  sigma_nat=mean(list_of_draws$sigma_nat),
+  sigma_nat_sd=sd(list_of_draws$sigma_nat),
+  sigma_reg=mean(list_of_draws$sigma_reg),
+  sigma_reg_sd=sd(list_of_draws$sigma_reg),
+  sigma_beta_reg=mean(list_of_draws$sigma_beta_reg),
+  sigma_beta_reg_sd=sd(list_of_draws$sigma_beta_reg),
+  sigma_beta_nat=mean(list_of_draws$sigma_beta_nat),
+  sigma_beta_nat_sd=sd(list_of_draws$sigma_beta_nat),
+  cor_sigma_nat_beta = cor(list_of_draws$sigma_nat,list_of_draws$sigma_beta_nat),
+  cor_sigma_reg_beta = cor(list_of_draws$sigma_reg,list_of_draws$sigma_beta_reg),
+  var_nat=mean(list_of_draws$var_nat),
+  var_reg=mean(list_of_draws$var_reg),
+  var_nat_sigma=sd(list_of_draws$var_nat),
+  var_reg_sigma=sd(list_of_draws$var_reg)
+ 
+) 
+
+
+#correlationss
+#kable(cor(list_of_draws$sigma_nat,list_of_draws$sigma_beta_nat))
+#kable(cor(list_of_draws$sigma_reg,list_of_draws$sigma_beta_reg))
+#beta_nat
+#colMeans(list_of_draws$beta_nat)
+#apply(list_of_draws$beta_nat,2,sd)
+
+```
+
 
 ### Variance
 ```{r inferences variance }
@@ -373,7 +438,7 @@ if(FALSE){
 }
 
 #posterior checks model B 
-fit_B = as.matrix(modelB_priors)
+
 paper_results=data.frame(var_nat=0.105,var_reg=0.0147)
 mcmc_areas(fit_B,regex_pars = "var",prob = 0.95)+
   geom_vline(data = paper_results, xintercept = paper_results$var_nat ,color="green")+
@@ -398,56 +463,15 @@ grid.arrange(p1, p2, ncol=2)
 
 ```
 
-### Parameters
 
-```{r inferences paramas}
- mcmc_areas(fit_B,pars = c("alpha","beta"))+
-  ggtitle("Fixed therms")
-
-p2 = mcmc_areas(fit_B,regex_pars = "^beta_nat")+
-  ggtitle("Beta at national level")
-p1 =mcmc_areas(fit_B,regex_pars = "^alpha_nat")+
-  ggtitle("Alpha at national level")
-grid.arrange(p1, p2, ncol=2)
-p1 = mcmc_intervals(fit_B,regex_pars = "^dev_reg")+
-  ggtitle("Alpha at regional level")
-p2 = mcmc_intervals(fit_B,regex_pars = "^dev_beta_reg")+
-  ggtitle("Beta at regional level")
-grid.arrange(p1, p2, ncol=2)
-
-list_of_draws=extract(modelB_priors)
-dev=data.frame(
-  alpha=mean(list_of_draws$alpha),
-  alpha_sd=sd(list_of_draws$alpha),
-  beta=mean(list_of_draws$beta),
-  beta_sd=sd(list_of_draws$beta),
-  sigma_nat=mean(list_of_draws$sigma_nat),
-  sigma_nat_sd=sd(list_of_draws$sigma_nat),
-  sigma_reg=mean(list_of_draws$sigma_reg),
-  sigma_reg_sd=sd(list_of_draws$sigma_reg),
-  sigma_beta_reg=mean(list_of_draws$sigma_beta_reg),
-  sigma_beta_reg_sd=sd(list_of_draws$sigma_beta_reg),
-  sigma_beta_nat=mean(list_of_draws$sigma_beta_nat),
-  sigma_beta_nat_sd=sd(list_of_draws$sigma_beta_nat),
-  cor_sigma_nat_beta = cor(list_of_draws$sigma_nat,list_of_draws$sigma_beta_nat),
-  cor_sigma_reg_beta = cor(list_of_draws$sigma_reg,list_of_draws$sigma_beta_reg)
-)
-
-modelB_pars = dev 
-#correlations
-cor(list_of_draws$sigma_nat,list_of_draws$sigma_beta_nat)
-cor(list_of_draws$sigma_reg,list_of_draws$sigma_beta_reg)
-#beta_nat
-colMeans(list_of_draws$beta_nat)
-apply(list_of_draws$beta_nat,2,sd)
-
-```
 
 
 
 
 
 # Comparison with paper
+
+###Parameters
 
 ```{r compare with paper results}
 paper=data.frame(parameter=c("alpha","beta","var_nat","var_reg","cor_nat","cor_reg","var_nat_beta","var_reg_beta"),
@@ -470,10 +494,10 @@ joinA = inner_join(paper,modelA_estimates,by="parameter")
 joinB = inner_join(paper,modelB_estimates,by="parameter")
 joinBeta =inner_join(table_5_paper,modelB_beta_estimates,by="nation")
 
-kable(joinA%>%filter(modelA_mean>X25. && modelA_mean<X75.),caption = "Model A values between 25 and 75 percentiles")
-kable(joinB%>%filter(modelB_mean>X25. && modelB_mean<X75.),caption = "Model B values between 25 and 75 percentiles")
+#kable(joinA%>%filter(modelA_mean>X25. && modelA_mean<X75.),caption = "Model A values between 25 and 75 percentiles")
+kable(joinB%>%filter(modelB_mean>X25. && modelB_mean<X75.),caption = "Model B values between 25 and 75 percentiles",digits = 2)
 kable(joinBeta%>%mutate(delta_sd=(sd.y-sd.x)/sd.x*100)%>%
-  arrange(delta_sd)%>%filter(estimate>X2.5. && estimate<X97.5.),caption = "Beta pooled values between 2.5 and 97.5 percentiles")
+  arrange(delta_sd)%>%filter(estimate>X2.5. && estimate<X97.5.),caption = "Beta pooled values between 2.5 and 97.5 percentiles",digits = 2)
 
 
 #figure 2 
@@ -512,10 +536,79 @@ ggplot(data=data,aes(x=uvb,y=log(eta),color=nation))+
 
 
 ```
+![Figure 1](./fig1.png)
+
+
+###Variance
+
+```{r variance paper vs model}
+list_of_draws=extract(modelB_priors)
+dev=data.frame(
+  alpha=mean(list_of_draws$alpha),
+  alpha_sd=sd(list_of_draws$alpha),
+  beta=mean(list_of_draws$beta),
+  beta_sd=sd(list_of_draws$beta),
+  sigma_nat=mean(list_of_draws$sigma_nat),
+  sigma_nat_sd=sd(list_of_draws$sigma_nat),
+  sigma_reg=mean(list_of_draws$sigma_reg),
+  sigma_reg_sd=sd(list_of_draws$sigma_reg),
+  sigma_beta_reg=mean(list_of_draws$sigma_beta_reg),
+  sigma_beta_reg_sd=sd(list_of_draws$sigma_beta_reg),
+  sigma_beta_nat=mean(list_of_draws$sigma_beta_nat),
+  sigma_beta_nat_sd=sd(list_of_draws$sigma_beta_nat),
+  cor_sigma_nat_beta = cor(list_of_draws$sigma_nat,list_of_draws$sigma_beta_nat),
+  cor_sigma_reg_beta = cor(list_of_draws$sigma_reg,list_of_draws$sigma_beta_reg),
+  var_nat=mean(list_of_draws$var_nat),
+  var_reg=mean(list_of_draws$var_reg),
+  var_nat_sigma=sd(list_of_draws$var_nat),
+  var_reg_sigma=sd(list_of_draws$var_reg)
+ 
+) 
+modelB_pars = dev 
+#modelB_pars$var_nat
+#modelB_pars$var_nat_sigma
+#modelB_pars$var_reg
+#modelB_pars$var_reg_sigma
+paper_var_nat = 0.140
+paper_var_nat_sd=0.0733
+
+paper_var_reg = 0.0424
+paper_var_reg_sd=0.00956
+
+variances=data.frame(
+  
+  parameter=c("variance_national","variance_regional"),
+  
+  paper_estimate=c(paper_var_nat, paper_var_reg),
+  
+  paper_se=c(paper_var_nat_sd, paper_var_reg_sd),
+
+  modelB_estimate=c(modelB_pars$var_nat,modelB_pars$var_reg),
+  
+  modelB_sd=c(modelB_pars$var_nat_sigma, modelB_pars$var_reg_sigma)
+  
+  )
+kable(variances,digits = 2)
+```
+
 
 
 ## Conclusions
 
 The obtained results are compatible with those from the paper, there is a relation between UVB and death rates but it's not in any means obvious.
 It depends from the considered nation, so pooling the data on nations is of vital importance to perform a valid analysis
-![Figure 1](./fig1.png)
+
+
+## Appendix
+
+Here I list all the computed parameters for model B
+
+```{r all the parameters}
+kable(summary(modelB_priors,pars=c("alpha"))$summary,digits = 2)
+kable(summary(modelB_priors,pars=c("beta"))$summary,digits = 2)
+kable(summary(modelB_priors,pars=c("beta_nat"))$summary,digits = 2)
+kable(summary(modelB_priors,pars=c("alpha_nat"))$summary,digits = 2)
+kable(summary(modelB_priors,pars=c("beta_reg"))$summary,digits = 2)
+kable(summary(modelB_priors,pars=c("alpha_reg"))$summary,digits = 2)
+
+```
