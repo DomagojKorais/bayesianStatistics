@@ -169,7 +169,7 @@ explanation of the symbols:
 
 
 ## Stan code used for model B:
-The model has been runned using 4 chains, a warmup period of 2000 and 4000 iterations, leaving other parameters as default ones.
+The model has been runned using 4 chains, a warmup period of 2000(default) and 4000 iterations, leaving other parameters as default ones.
 To replicate the results compile this same Rmd file changing setting <code>recompute=TRUE</code> in the setup section.
 ```{r model implementation}
 modelB_priors=readRDS("models/modelB_priors.stanModel")
